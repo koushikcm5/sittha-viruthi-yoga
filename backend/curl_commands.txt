@@ -1,0 +1,41 @@
+# cURL Commands for Testing Password Reset API
+
+## 1. Test Forgot Password (Send Reset Email)
+curl -X POST http://localhost:9000/api/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com"}'
+
+# Expected Response:
+# {"message": "Password reset email sent successfully"}
+
+## 2. Test Reset Password (Using Token from Email)
+curl -X POST http://localhost:9000/api/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token": "your-token-from-email", "newPassword": "newpassword123"}'
+
+# Expected Response:
+# {"message": "Password reset successfully"}
+
+## 3. Test with Invalid Email
+curl -X POST http://localhost:9000/api/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email": "nonexistent@example.com"}'
+
+# Expected Response:
+# {"error": "User not found with email: nonexistent@example.com"}
+
+## 4. Test with Invalid Token
+curl -X POST http://localhost:9000/api/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token": "invalid-token", "newPassword": "newpassword123"}'
+
+# Expected Response:
+# {"error": "Invalid reset token"}
+
+## 5. Test with Expired Token (after 15 minutes)
+curl -X POST http://localhost:9000/api/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token": "expired-token", "newPassword": "newpassword123"}'
+
+# Expected Response:
+# {"error": "Reset token has expired"}
