@@ -66,4 +66,40 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+    
+    @GetMapping("/pending-users")
+    public ResponseEntity<?> getPendingUsers() {
+        try {
+            return ResponseEntity.ok(authService.getPendingUsers());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    @PostMapping("/approve-user/{username}")
+    public ResponseEntity<?> approveUser(@PathVariable String username) {
+        try {
+            return ResponseEntity.ok(authService.approveUser(username));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    @GetMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@RequestParam String token) {
+        try {
+            return ResponseEntity.ok(authService.verifyEmail(token));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    @PostMapping("/resend-verification")
+    public ResponseEntity<?> resendVerification(@RequestBody Map<String, String> request) {
+        try {
+            return ResponseEntity.ok(authService.resendVerification(request.get("email")));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

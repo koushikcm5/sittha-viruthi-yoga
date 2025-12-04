@@ -1,46 +1,45 @@
-# Node
+# Dependencies
 node_modules/
-npm-debug.log
-yarn-error.log
+frontend/node_modules/
 
-# Expo
-.expo/
-.expo-shared/
-dist/
-
-# Native
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
+# Build outputs
+backend/target/
+frontend/android/app/build/
+frontend/android/build/
+frontend/ios/build/
+frontend/.expo/
 *.apk
 *.aab
 *.ipa
 
-# Metro
-.metro-health-check*
+# Logs
+*.log
+backend/*.log
 
-# Debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+# Environment & Secrets
+.env
+.env.local
+.env.production
+backend/.env
+backend/src/main/resources/application-prod.properties
+*.keystore
+*.jks
 
-# macOS
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# OS
 .DS_Store
-*.pem
+Thumbs.db
 
-# local env files
-.env*.local
+# Gradle
+frontend/android/.gradle/
+frontend/android/local.properties
 
-# Backend
-backend/target/
+# Maven
 backend/.mvn/
 backend/mvnw
 backend/mvnw.cmd
-backend/.idea/
-backend/*.iml
-
-# Logs
-*.log
