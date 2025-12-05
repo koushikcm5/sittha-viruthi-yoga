@@ -76,7 +76,7 @@ public class AuthService {
         user.setEmail(email);
         user.setPhone(phone);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(User.Role.ADMIN);  // Create as ADMIN for testing
+        user.setRole(User.Role.USER);  // Create as USER by default
         user.setApproved(true);  // Auto-approve for easier testing
         user.setEmailVerified(true);  // Auto-verify for easier testing
         user.setVerificationToken(UUID.randomUUID().toString());
