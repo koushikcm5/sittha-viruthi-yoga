@@ -76,7 +76,12 @@ public class AuthService {
         user.setEmail(email);
         user.setPhone(phone);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(User.Role.USER);  // Create as USER by default
+        // Create as ADMIN if username starts with 'admin', otherwise USER
+        if (username.toLowerCase().startsWith("admin")) {
+            user.setRole(User.Role.ADMIN);
+        } else {
+            user.setRole(User.Role.USER);
+        }
         user.setApproved(true);  // Auto-approve for easier testing
         user.setEmailVerified(true);  // Auto-verify for easier testing
         user.setVerificationToken(UUID.randomUUID().toString());
