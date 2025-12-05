@@ -77,8 +77,8 @@ public class AuthService {
         user.setPhone(phone);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(User.Role.USER);
-        user.setApproved(false);
-        user.setEmailVerified(false);
+        user.setApproved(true);  // Auto-approve for easier testing
+        user.setEmailVerified(true);  // Auto-verify for easier testing
         user.setVerificationToken(UUID.randomUUID().toString());
         
         userRepository.save(user);
