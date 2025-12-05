@@ -1,23 +1,18 @@
-# Use Ubuntu base with Java pre-installed
-FROM ubuntu:22.04
-
-# Install Java 17 and Maven
-RUN apt-get update && \
-    apt-get install -y openjdk-17-jdk maven && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
+# ===== Build Stage =====
+FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copy project files
 COPY backend/pom.xml .
 COPY backend/src ./src
 
-# Build application
 RUN mvn clean package -DskipTests
 
-# Expose port
-EXPOSE 8080
 
-# Run application
-CMD ["java", "-jar", "target/attendance-1.0.0.jar"]
+# ===== Run Stage =====
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+
+COPY --from=build /app/target/*.jar app.jar
+
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]
