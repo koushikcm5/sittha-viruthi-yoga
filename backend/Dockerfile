@@ -6,7 +6,7 @@ COPY src ./src
 RUN mvn -B -DskipTests clean package
 
 # ---------- Runtime Stage ----------
-FROM eclipse-temurin:17-jre-alpine
+FROM openjdk:17-slim
 WORKDIR /app
 COPY --from=build /app/target/attendance-1.0.0.jar app.jar
 

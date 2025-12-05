@@ -34,7 +34,12 @@
     "react-native-webview": "^13.16.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.20.0",
+    "@react-native-community/cli": "^20.0.2",
+    "@react-native-community/cli-platform-android": "^20.0.2",
+    "@react-native-community/cli-platform-ios": "^20.0.2",
+    "@react-native/metro-config": "^0.82.1",
+    "metro-config": "^0.83.3"
   },
   "private": true
 }
