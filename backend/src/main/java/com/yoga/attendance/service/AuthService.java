@@ -82,7 +82,14 @@ public class AuthService {
         user.setVerificationToken(UUID.randomUUID().toString());
         
         userRepository.save(user);
-        emailService.sendVerificationEmail(user.getEmail(), user.getVerificationToken());
+        
+        // Send email asynchronously to avoid blocking registration
+        try {
+            emailService.sendVerificationEmail(user.getEmail(), user.getVerificationToken());
+        } catch (Exception e) {
+            // Log error but don't fail registration
+            System.err.println("Failed to send verification email: " + e.getMessage());
+        }
         
         return Map.of("message", "Registration successful. Please check your email to verify your account.");
     }
