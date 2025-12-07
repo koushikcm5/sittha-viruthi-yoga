@@ -22,7 +22,7 @@ export default function ForgotPasswordScreen({ navigation }) {
 
     setLoading(true);
     try {
-      await authAPI.forgotPassword(email);
+      const response = await authAPI.forgotPassword(email);
       setSuccessModal(true);
     } catch (error) {
       setErrorModal(error.message || 'Failed to send OTP. Please try again.');
