@@ -1,36 +1,43 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Modal } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { authAPI } from '../../services/api';
 
 export default function ForgotPasswordScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [successModal, setSuccessModal] = useState(false);
+  const [errorModal, setErrorModal] = useState(null);
 
   const handleSendOTP = async () => {
     if (!email) {
-      alert('Please enter your email');
+      setErrorModal('Please enter your email address');
       return;
     }
 
     if (!email.includes('@')) {
-      alert('Please enter a valid email address');
+      setErrorModal('Please enter a valid email address');
       return;
     }
 
     setLoading(true);
     try {
       await authAPI.forgotPassword(email);
-      alert('OTP sent successfully! Please check your email (including spam folder).');
-      navigation.navigate('ResetPassword', { email });
+      setSuccessModal(true);
     } catch (error) {
       if (error.message.includes('timeout')) {
-        alert('Email sending is taking longer than expected. Please check your email in a few minutes or try again.');
+        setErrorModal('Email sending is taking longer than expected. Please check your email in a few minutes or try again.');
       } else {
-        alert(error.message || 'Failed to send OTP. Please try again.');
+        setErrorModal(error.message || 'Failed to send OTP. Please try again.');
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSuccessClose = () => {
+    setSuccessModal(false);
+    navigation.navigate('ResetPassword', { email });
   };
 
   return (
@@ -70,6 +77,44 @@ export default function ForgotPasswordScreen({ navigation }) {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Success Modal */}
+      {successModal && (
+        <Modal visible={true} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.successModalContent}>
+              <View style={styles.successIconCircle}>
+                <MaterialIcons name="check" size={40} color="#FFFFFF" />
+              </View>
+              <Text style={styles.modalTitle}>OTP Sent Successfully!</Text>
+              <Text style={styles.modalDesc}>
+                We've sent a 6-digit OTP to your email address. Please check your inbox (and spam folder).
+              </Text>
+              <TouchableOpacity style={styles.modalBtn} onPress={handleSuccessClose}>
+                <Text style={styles.modalBtnText}>Continue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Error Modal */}
+      {errorModal && (
+        <Modal visible={true} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.errorModalContent}>
+              <View style={styles.errorIconCircle}>
+                <MaterialIcons name="error" size={40} color="#FFFFFF" />
+              </View>
+              <Text style={styles.modalTitle}>Unable to Send OTP</Text>
+              <Text style={styles.modalDesc}>{errorModal}</Text>
+              <TouchableOpacity style={styles.errorModalBtn} onPress={() => setErrorModal(null)}>
+                <Text style={styles.modalBtnText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -168,5 +213,77 @@ const styles = StyleSheet.create({
     color: '#00A8A8',
     fontSize: 15,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 32,
+    width: '85%',
+    alignItems: 'center',
+  },
+  errorModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 32,
+    width: '85%',
+    alignItems: 'center',
+  },
+  successIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  errorIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1B3B6F',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalDesc: {
+    fontSize: 15,
+    color: '#6B7280',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  modalBtn: {
+    backgroundColor: '#00A8A8',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    width: '100%',
+  },
+  errorModalBtn: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    width: '100%',
+  },
+  modalBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });

@@ -95,11 +95,15 @@ public class AuthService {
         
         try {
             emailService.sendPasswordResetOtp(user.getEmail(), otp);
+            return Map.of("message", "Password reset OTP sent to email");
         } catch (Exception e) {
             System.err.println("Failed to send reset OTP: " + e.getMessage());
+            // Reset the OTP fields since email failed
+            user.setResetOtp(null);
+            user.setResetOtpExpiry(null);
+            userRepository.save(user);
+            throw new RuntimeException("Failed to send email. Please check your email address and try again.");
         }
-        
-        return Map.of("message", "Password reset OTP sent to email");
     }
     
     public Map<String, String> resetPassword(String email, String otp, String newPassword) {
