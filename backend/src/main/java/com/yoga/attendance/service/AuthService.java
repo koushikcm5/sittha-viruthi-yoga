@@ -93,20 +93,15 @@ public class AuthService {
         user.setResetOtpExpiry(java.time.LocalDateTime.now().plusMinutes(10));
         userRepository.save(user);
         
-        try {
-            emailService.sendPasswordResetOtp(user.getEmail(), otp);
+        if (emailService.sendPasswordResetOtp(user.getEmail(), otp)) {
             return Map.of("message", "Password reset OTP sent to email");
-        } catch (Exception e) {
-            System.err.println("Failed to send reset OTP: " + e.getMessage());
-            
-            // For testing: Show OTP in console when email fails
+        } else {
             System.out.println("\n=== EMAIL FAILED - TESTING OTP ===");
             System.out.println("Email: " + email);
             System.out.println("OTP: " + otp);
             System.out.println("Use this OTP for testing purposes");
             System.out.println("==================================\n");
             
-            // Keep OTP for testing but inform user about email issue
             return Map.of("message", "Email service temporarily unavailable. For testing, check server console for OTP.");
         }
     }
@@ -217,7 +212,12 @@ public class AuthService {
         user.setVerificationOtp(otp);
         user.setVerificationOtpExpiry(java.time.LocalDateTime.now().plusMinutes(10));
         userRepository.save(user);
-        emailService.sendVerificationOtp(user.getEmail(), otp);
+        if (!emailService.sendVerificationOtp(user.getEmail(), otp)) {
+            System.out.println("\n=== EMAIL FAILED - CONSOLE OTP ===");
+            System.out.println("Email: " + email);
+            System.out.println("Verification OTP: " + otp);
+            System.out.println("================================\n");
+        }
         
         return Map.of("message", "Verification OTP sent");
     }

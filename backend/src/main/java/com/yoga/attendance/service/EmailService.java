@@ -15,7 +15,7 @@ public class EmailService {
     @Autowired
     private JavaMailSender mailSender;
     
-    public void sendVerificationOtp(String to, String otp) {
+    public boolean sendVerificationOtp(String to, String otp) {
         System.out.println("\n=== EMAIL VERIFICATION OTP ===");
         System.out.println("To: " + to);
         System.out.println("OTP: " + otp);
@@ -32,23 +32,23 @@ public class EmailService {
             
             mailSender.send(message);
             System.out.println("✓ Verification OTP email sent successfully to: " + to);
+            return true;
         } catch (Exception e) {
             System.err.println("✗ Email sending failed: " + e.getMessage());
-            e.printStackTrace();
-            throw new RuntimeException("Failed to send verification email: " + e.getMessage());
+            return false;
         }
     }
     
-    public void sendPasswordResetOtp(String to, String otp) {
+    public boolean sendPasswordResetOtp(String to, String otp) {
         System.out.println("\n=== PASSWORD RESET OTP ===");
         System.out.println("To: " + to);
         System.out.println("OTP: " + otp);
         System.out.println("==========================\n");
         
         try {
-            // Validate email format
             if (to == null || !to.contains("@")) {
-                throw new RuntimeException("Invalid email address format");
+                System.err.println("✗ Invalid email format");
+                return false;
             }
             
             MimeMessage message = mailSender.createMimeMessage();
@@ -62,17 +62,11 @@ public class EmailService {
             System.out.println("Attempting to send email...");
             mailSender.send(message);
             System.out.println("✓ Password reset OTP email sent successfully to: " + to);
+            return true;
             
-        } catch (org.springframework.mail.MailAuthenticationException e) {
-            System.err.println("✗ Email authentication failed: " + e.getMessage());
-            throw new RuntimeException("Email service authentication failed. Please contact support.");
-        } catch (org.springframework.mail.MailSendException e) {
-            System.err.println("✗ Email sending failed: " + e.getMessage());
-            throw new RuntimeException("Unable to send email. Please check your email address and try again.");
         } catch (Exception e) {
-            System.err.println("✗ Unexpected email error: " + e.getMessage());
-            e.printStackTrace();
-            throw new RuntimeException("Email service temporarily unavailable. Please try again later.");
+            System.err.println("✗ Email sending failed: " + e.getMessage());
+            return false;
         }
     }
     
