@@ -98,11 +98,16 @@ public class AuthService {
             return Map.of("message", "Password reset OTP sent to email");
         } catch (Exception e) {
             System.err.println("Failed to send reset OTP: " + e.getMessage());
-            // Reset the OTP fields since email failed
-            user.setResetOtp(null);
-            user.setResetOtpExpiry(null);
-            userRepository.save(user);
-            throw new RuntimeException("Failed to send email. Please check your email address and try again.");
+            
+            // For testing: Show OTP in console when email fails
+            System.out.println("\n=== EMAIL FAILED - TESTING OTP ===");
+            System.out.println("Email: " + email);
+            System.out.println("OTP: " + otp);
+            System.out.println("Use this OTP for testing purposes");
+            System.out.println("==================================\n");
+            
+            // Keep OTP for testing but inform user about email issue
+            return Map.of("message", "Email service temporarily unavailable. For testing, check server console for OTP.");
         }
     }
     

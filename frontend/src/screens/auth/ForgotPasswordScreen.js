@@ -27,6 +27,8 @@ export default function ForgotPasswordScreen({ navigation }) {
     } catch (error) {
       if (error.message.includes('timeout')) {
         setErrorModal('Email sending is taking longer than expected. Please check your email in a few minutes or try again.');
+      } else if (error.message.includes('console')) {
+        setErrorModal('Email service is temporarily unavailable. For testing purposes, the OTP has been logged to the server console. Please check with the developer.');
       } else {
         setErrorModal(error.message || 'Failed to send OTP. Please try again.');
       }

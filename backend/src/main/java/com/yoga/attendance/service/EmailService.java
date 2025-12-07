@@ -46,20 +46,33 @@ public class EmailService {
         System.out.println("==========================\n");
         
         try {
+            // Validate email format
+            if (to == null || !to.contains("@")) {
+                throw new RuntimeException("Invalid email address format");
+            }
+            
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             
             helper.setFrom("kishorekishore2145y@gmail.com");
             helper.setTo(to);
-            helper.setSubject("Reset your Yoga App password");
+            helper.setSubject("Sittha Viruthi Yoga - Reset Password OTP");
             helper.setText(getResetOtpTemplate(otp), true);
             
+            System.out.println("Attempting to send email...");
             mailSender.send(message);
             System.out.println("✓ Password reset OTP email sent successfully to: " + to);
-        } catch (Exception e) {
+            
+        } catch (org.springframework.mail.MailAuthenticationException e) {
+            System.err.println("✗ Email authentication failed: " + e.getMessage());
+            throw new RuntimeException("Email service authentication failed. Please contact support.");
+        } catch (org.springframework.mail.MailSendException e) {
             System.err.println("✗ Email sending failed: " + e.getMessage());
+            throw new RuntimeException("Unable to send email. Please check your email address and try again.");
+        } catch (Exception e) {
+            System.err.println("✗ Unexpected email error: " + e.getMessage());
             e.printStackTrace();
-            throw new RuntimeException("Failed to send password reset email: " + e.getMessage());
+            throw new RuntimeException("Email service temporarily unavailable. Please try again later.");
         }
     }
     
