@@ -12,13 +12,22 @@ export default function ForgotPasswordScreen({ navigation }) {
       return;
     }
 
+    if (!email.includes('@')) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
     try {
       await authAPI.forgotPassword(email);
-      alert('OTP sent to your email!');
+      alert('OTP sent successfully! Please check your email (including spam folder).');
       navigation.navigate('ResetPassword', { email });
     } catch (error) {
-      alert(error.message);
+      if (error.message.includes('timeout')) {
+        alert('Email sending is taking longer than expected. Please check your email in a few minutes or try again.');
+      } else {
+        alert(error.message || 'Failed to send OTP. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

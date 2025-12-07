@@ -113,25 +113,53 @@ export const authAPI = {
   },
 
   forgotPassword: async (email) => {
-    const response = await fetchWithTimeout(`${API_URL}/auth/forgot-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    const data = await parseResponse(response);
-    if (!response.ok) throw new Error(data.error || 'Failed to send reset email');
-    return data;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    try {
+      const response = await fetch(`${API_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeout);
+      const data = await parseResponse(response);
+      if (!response.ok) throw new Error(data.error || 'Failed to send reset email');
+      return data;
+    } catch (error) {
+      clearTimeout(timeout);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout. Email sending may take longer than expected. Please check your email.');
+      }
+      throw error;
+    }
   },
 
   resetPassword: async (email, otp, newPassword) => {
-    const response = await fetchWithTimeout(`${API_URL}/auth/reset-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, otp, newPassword })
-    });
-    const data = await parseResponse(response);
-    if (!response.ok) throw new Error(data.error || 'Failed to reset password');
-    return data;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+    
+    try {
+      const response = await fetch(`${API_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, newPassword }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeout);
+      const data = await parseResponse(response);
+      if (!response.ok) throw new Error(data.error || 'Failed to reset password');
+      return data;
+    } catch (error) {
+      clearTimeout(timeout);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout. Please try again.');
+      }
+      throw error;
+    }
   },
 
   logout: async () => {
