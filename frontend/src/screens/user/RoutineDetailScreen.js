@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import SecureVideoPlayer from '../../components/common/SecureVideoPlayer';
-
-const API_URL = 'http://10.10.42.68:9000/api';
+import UniversalVideoPlayer from '../../components/common/UniversalVideoPlayer';
+import { API_URL } from '../../../config';
 
 export default function RoutineDetailScreen({ route, navigation }) {
   const { step } = route.params;
@@ -367,37 +366,25 @@ Divine, thank you, thank you, thank you.`,
       title: { english: 'Awareness', tamil: 'விழிப்புணர்வு' },
       icon: 'visibility',
       content: {
-        english: `Awareness is the practice of being fully present in the moment.
+        english: `Translation of the First Content
 
-🧠 How to Practice:
+“Conduct and discipline mean choosing actions, words, and thoughts that cause no harm—neither to oneself nor to others—whether in the present or the future, and whether to the body, the mind, or the soul.”
 
-1. Sit or stand comfortably
-2. Bring attention to your breath
-3. Notice your thoughts without judgment
-4. Observe your emotions as they arise
-5. Be aware of your body sensations
-6. Notice sounds, smells, and surroundings
-7. Stay present for 10-15 minutes
 
-🎯 Key Points:
+2. Translation of the Second Content
 
-- Don't try to control thoughts
-- Simply observe without attachment
-- If mind wanders, gently return to awareness
-- Practice throughout the day
-- Be aware during daily activities
+“Between one sankalpa (affirmation/intention) and the next, reflect and check whether you have failed to uphold this discipline. If you find that you have faltered, read the statement of repentance on their behalf and then proceed to make your next sankalpa.”
+1. Simplified Version of the First Content
 
-💭 Awareness Questions:
+“Discipline means not hurting yourself or others in any way—through your thoughts, words, or actions—now or in the future, whether it affects the body, mind, or soul.”
 
-Ask yourself:
-- What am I thinking right now?
-- What am I feeling?
-- What sensations are in my body?
-- Am I present or lost in thoughts?
 
-⏰ Practice:
-Multiple times throughout the day, especially during routine activities like eating, walking, or working.`,
-        tamil: `[Tamil content for Awareness - You will update this]`
+2. Simplified Version of the Second Content
+
+“Before making each new intention (sankalpa), think about whether you broke this discipline. If you did, read the apology statement for anyone you may have affected, and then make your next intention.”`,
+        tamil: `தனக்கோ பிறருக்கும் தற்காலத்திலும் பிற்காலத்திலோ உடலிருக்கோ மனதிற்கு ஆன்மாவிற்க்கோ எண்ணம் சொல் செயலால் துன்பம் தராத செயல் ஒழுக்கம்.
+        
+        இந்த ஒழுக்கத்தை ஒரு சங்கல்பத்திற்கு அடுத்த சங்கல்பத்திற்கும் இடையே நாம்  இழந்திருக்கிறோமா என்று சரி பார்த்து அப்படி இழந்திருந்தால் அவர்களுக்காக மன்னிப்பு அறிக்கையை படித்துவிட்டு சங்கல்பம் செய்யவும்.`
       }
     },
     4: {
@@ -955,13 +942,9 @@ You are blessed.`,
       </View>
 
       {playingVideo && (
-        <SecureVideoPlayer
+        <UniversalVideoPlayer
           videoUrl={playingVideo}
           onClose={() => setPlayingVideo(null)}
-          onComplete={() => {
-            setPlayingVideo(null);
-            setHasRead(true);
-          }}
         />
       )}
     </View>
@@ -1072,7 +1055,8 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   },
   footer: { 
-    padding: 20, 
+    padding: 20,
+    paddingBottom: 30,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
@@ -1080,7 +1064,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 4
+    elevation: 8
   },
   completeBtn: { 
     backgroundColor: '#00A8A8', 

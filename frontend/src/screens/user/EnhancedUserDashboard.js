@@ -175,8 +175,8 @@ export default function EnhancedUserDashboard({ navigation }) {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Welcome, {username}</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtn}>← Back</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('UserDashboard', { username })}>
+          <Text style={styles.backBtn}>← Dashboard</Text>
         </TouchableOpacity>
       </View>
 

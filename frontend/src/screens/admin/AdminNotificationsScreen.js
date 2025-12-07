@@ -71,7 +71,7 @@ export default function AdminNotificationsScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('AdminDashboard')} style={styles.backBtn}>
           <MaterialIcons name="arrow-back" size={24} color="#1B3B6F" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Admin Notifications</Text>

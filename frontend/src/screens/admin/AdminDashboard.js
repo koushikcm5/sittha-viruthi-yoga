@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { notificationService } from '../../services/notificationService';
-
-const API_URL = 'http://10.10.42.68:9000/api';
+import { API_URL } from '../../../config';
 
 export default function AdminDashboard({ navigation }) {
   const [activeTab, setActiveTab] = useState('overview');
@@ -36,6 +35,7 @@ export default function AdminDashboard({ navigation }) {
   const [expandedAppointment, setExpandedAppointment] = useState(null);
   const [expandedQA, setExpandedQA] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [successAlert, setSuccessAlert] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -110,7 +110,10 @@ export default function AdminDashboard({ navigation }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answer: qaAnswer })
       });
-      Alert.alert('Success', 'Answer submitted!');
+      // Notify user of answer
+      await notificationService.notifyQuestionAnswered(qaModal.username, qaModal.question);
+      
+      setSuccessAlert('Answer submitted successfully!');
       setQaModal(null);
       setQaAnswer('');
       loadQA();
@@ -127,7 +130,10 @@ export default function AdminDashboard({ navigation }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scheduledDate: formatted, adminNotes })
       });
-      Alert.alert('Success', 'Appointment approved!');
+      // Notify user of approval
+      await notificationService.notifyAppointmentScheduled(appointmentModal.username, formatted);
+      
+      setSuccessAlert('Appointment approved successfully!');
       setAppointmentModal(null);
       setAdminNotes('');
       loadAppointments();
@@ -143,7 +149,10 @@ export default function AdminDashboard({ navigation }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminNotes })
       });
-      Alert.alert('Success', 'Appointment rejected');
+      // Notify user of rejection
+      await notificationService.notifyAppointmentRejected(appointmentModal.username, adminNotes);
+      
+      setSuccessAlert('Appointment rejected');
       setAppointmentModal(null);
       setAdminNotes('');
       loadAppointments();
@@ -191,42 +200,52 @@ export default function AdminDashboard({ navigation }) {
       await fetch(`${API_URL}/auth/approve-user/${username}`, {
         method: 'POST'
       });
-      Alert.alert('Success', 'User approved successfully!');
+      // Notify user of approval
+      await notificationService.notifyAccountApproved(username);
+      
+      setSuccessAlert(`User '${username}' has been approved successfully! They can now login to the app.`);
       loadPendingUsers();
+      loadData();
     } catch (error) {
       Alert.alert('Error', 'Failed to approve user');
     }
   };
 
-  const loadData = async () =>{
-    const pRes = await fetch(`${API_URL}/content/admin/progress`);
-    const pData = await pRes.json();
-    const progressData = Array.isArray(pData) ? pData : [];
-    setProgress(progressData);
-    setFilteredProgress(progressData);
-    
-    const uRes = await fetch(`${API_URL}/attendance/users`);
-    const uData = await uRes.json();
-    const allUsers = Array.isArray(uData) ? uData : [];
-    setUsers(allUsers);
-    
-    // Get today's attendance
-    const aRes = await fetch(`${API_URL}/attendance/all`);
-    const aData = await aRes.json();
-    const allAttendance = Array.isArray(aData) ? aData : [];
-    setAttendanceRecords(allAttendance);
-    
-    // Calculate stats
-    const today = new Date().toISOString().split('T')[0];
-    const todayAttendance = allAttendance.filter(a => a.date.startsWith(today));
-    const attendedToday = todayAttendance.filter(a => a.attended).length;
-    const pendingToday = allUsers.length - todayAttendance.length;
-    
-    setStats({ 
-      totalUsers: allUsers.length, 
-      attended: attendedToday, 
-      absent: pendingToday 
-    });
+  const loadData = async () => {
+    try {
+      const pRes = await fetch(`${API_URL}/content/admin/progress`);
+      if (!pRes.ok) throw new Error('Failed to load progress');
+      const pData = await pRes.json();
+      const progressData = Array.isArray(pData) ? pData : [];
+      setProgress(progressData);
+      setFilteredProgress(progressData);
+      
+      const uRes = await fetch(`${API_URL}/attendance/users`);
+      if (!uRes.ok) throw new Error('Failed to load users');
+      const uData = await uRes.json();
+      const allUsers = Array.isArray(uData) ? uData : [];
+      setUsers(allUsers);
+      
+      const aRes = await fetch(`${API_URL}/attendance/all`);
+      if (!aRes.ok) throw new Error('Failed to load attendance');
+      const aData = await aRes.json();
+      const allAttendance = Array.isArray(aData) ? aData : [];
+      setAttendanceRecords(allAttendance);
+      
+      const today = new Date().toISOString().split('T')[0];
+      const todayAttendance = allAttendance.filter(a => a?.date?.startsWith(today));
+      const attendedToday = todayAttendance.filter(a => a?.attended).length;
+      const pendingToday = allUsers.length - todayAttendance.length;
+      
+      setStats({ 
+        totalUsers: allUsers.length, 
+        attended: attendedToday, 
+        absent: Math.max(0, pendingToday)
+      });
+    } catch (error) {
+      console.error('Error loading admin data:', error);
+      setStats({ totalUsers: 0, attended: 0, absent: 0 });
+    }
   };
 
   const applyFilters = () => {
@@ -628,7 +647,7 @@ export default function AdminDashboard({ navigation }) {
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.usersBtn} onPress={() => navigation.navigate('AdminNotifications')}>
-            <MaterialIcons name="notifications" size={20} color="#FFFFFF" />
+            <MaterialIcons name="notifications" size={18} color="#FFFFFF" />
             {unreadCount > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{unreadCount}</Text>
@@ -636,7 +655,7 @@ export default function AdminDashboard({ navigation }) {
             )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.usersBtn} onPress={() => setActiveTab('users')}>
-            <MaterialIcons name="people" size={20} color="#FFFFFF" />
+            <MaterialIcons name="people" size={18} color="#FFFFFF" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.logoutBtn} onPress={async () => {
             await AsyncStorage.removeItem('token');
@@ -644,7 +663,7 @@ export default function AdminDashboard({ navigation }) {
             await AsyncStorage.removeItem('role');
             navigation.navigate('Login');
           }}>
-            <Text style={styles.logoutText}>Logout</Text>
+            <MaterialIcons name="logout" size={16} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
       </View>
@@ -652,23 +671,30 @@ export default function AdminDashboard({ navigation }) {
       {/* Tab Bar */}
       <View style={styles.tabBar}>
         <TouchableOpacity style={[styles.tab, activeTab === 'overview' && styles.tabActive]} onPress={() => setActiveTab('overview')}>
-          <MaterialIcons name="dashboard" size={20} color={activeTab === 'overview' ? '#00A8A8' : '#6B7280'} />
+          <MaterialIcons name="dashboard" size={18} color={activeTab === 'overview' ? '#00A8A8' : '#6B7280'} />
           <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>Overview</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tab, activeTab === 'content' && styles.tabActive]} onPress={() => setActiveTab('content')}>
-          <MaterialIcons name="video-library" size={20} color={activeTab === 'content' ? '#00A8A8' : '#6B7280'} />
-          <Text style={[styles.tabText, activeTab === 'content' && styles.tabTextActive]}>Content</Text>
+          <MaterialIcons name="video-library" size={18} color={activeTab === 'content' ? '#00A8A8' : '#6B7280'} />
+          <Text style={[styles.tabText, activeTab === 'content' && styles.tabTextActive]}>Course</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tab, activeTab === 'appointments' && styles.tabActive]} onPress={() => setActiveTab('appointments')}>
-          <MaterialIcons name="event" size={20} color={activeTab === 'appointments' ? '#00A8A8' : '#6B7280'} />
-          <Text style={[styles.tabText, activeTab === 'appointments' && styles.tabTextActive]}>Appointments</Text>
+          <MaterialIcons name="event" size={18} color={activeTab === 'appointments' ? '#00A8A8' : '#6B7280'} />
+          <Text style={[styles.tabText, activeTab === 'appointments' && styles.tabTextActive]}>Appointment</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tab, activeTab === 'qa' && styles.tabActive]} onPress={() => setActiveTab('qa')}>
-          <MaterialIcons name="question-answer" size={20} color={activeTab === 'qa' ? '#00A8A8' : '#6B7280'} />
+          <MaterialIcons name="question-answer" size={18} color={activeTab === 'qa' ? '#00A8A8' : '#6B7280'} />
           <Text style={[styles.tabText, activeTab === 'qa' && styles.tabTextActive]}>Q&A</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tab, activeTab === 'pending' && styles.tabActive]} onPress={() => setActiveTab('pending')}>
-          <MaterialIcons name="person-add" size={20} color={activeTab === 'pending' ? '#00A8A8' : '#6B7280'} />
+          <View style={{position: 'relative'}}>
+            <MaterialIcons name="person-add" size={18} color={activeTab === 'pending' ? '#00A8A8' : '#6B7280'} />
+            {pendingUsers.length > 0 && (
+              <View style={styles.pendingBadge}>
+                <Text style={styles.pendingBadgeText}>{pendingUsers.length}</Text>
+              </View>
+            )}
+          </View>
           <Text style={[styles.tabText, activeTab === 'pending' && styles.tabTextActive]}>Pending</Text>
         </TouchableOpacity>
       </View>
@@ -798,7 +824,9 @@ export default function AdminDashboard({ navigation }) {
       {/* Appointment Review Modal */}
       {appointmentModal && (
         <Modal visible={true} transparent animationType="slide">
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}>
             <View style={styles.appointmentModalContent}>
               <View style={styles.editModalHeader}>
                 <Text style={styles.editModalTitle}>Review Appointment</Text>
@@ -806,63 +834,69 @@ export default function AdminDashboard({ navigation }) {
                   <MaterialIcons name="close" size={24} color="#111827" />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.appointmentModalUser}>User: {appointmentModal.username}</Text>
-              <Text style={styles.appointmentModalReason}>Reason: {appointmentModal.reason}</Text>
-              
-              <Text style={styles.appointmentModalLabel}>Schedule Date & Time:</Text>
-              <View style={styles.dateTimeRow}>
-                <TouchableOpacity style={styles.dateTimeBtn} onPress={() => setShowScheduleDatePicker(true)}>
-                  <Text style={styles.dateTimeBtnText}>📅 {scheduleDate.toLocaleDateString()}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.dateTimeBtn} onPress={() => setShowScheduleTimePicker(true)}>
-                  <Text style={styles.dateTimeBtnText}>🕐 {scheduleDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
-                </TouchableOpacity>
-              </View>
-              
-              {showScheduleDatePicker && (
-                <DateTimePicker
-                  value={scheduleDate}
-                  mode="date"
-                  display="default"
-                  onChange={onScheduleDateChange}
-                  minimumDate={new Date()}
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.appointmentModalUser}>User: {appointmentModal.username}</Text>
+                <Text style={styles.appointmentModalReason}>Reason: {appointmentModal.reason}</Text>
+                
+                <Text style={styles.appointmentModalLabel}>Schedule Date & Time:</Text>
+                <View style={styles.dateTimeRow}>
+                  <TouchableOpacity style={styles.dateTimeBtn} onPress={() => setShowScheduleDatePicker(true)}>
+                    <MaterialIcons name="event" size={16} color="#00A8A8" style={{marginRight: 6}} />
+                    <Text style={styles.dateTimeBtnText}>{scheduleDate.toLocaleDateString()}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dateTimeBtn} onPress={() => setShowScheduleTimePicker(true)}>
+                    <MaterialIcons name="access-time" size={16} color="#00A8A8" style={{marginRight: 6}} />
+                    <Text style={styles.dateTimeBtnText}>{scheduleDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {showScheduleDatePicker && (
+                  <DateTimePicker
+                    value={scheduleDate}
+                    mode="date"
+                    display="default"
+                    onChange={onScheduleDateChange}
+                    minimumDate={new Date()}
+                  />
+                )}
+                
+                {showScheduleTimePicker && (
+                  <DateTimePicker
+                    value={scheduleDate}
+                    mode="time"
+                    display="default"
+                    onChange={onScheduleTimeChange}
+                  />
+                )}
+                
+                <TextInput
+                  style={styles.appointmentNotesInput}
+                  placeholder="Admin notes (optional)"
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  value={adminNotes}
+                  onChangeText={setAdminNotes}
                 />
-              )}
-              
-              {showScheduleTimePicker && (
-                <DateTimePicker
-                  value={scheduleDate}
-                  mode="time"
-                  display="default"
-                  onChange={onScheduleTimeChange}
-                />
-              )}
-              
-              <TextInput
-                style={styles.appointmentNotesInput}
-                placeholder="Admin notes (optional)"
-                placeholderTextColor="#9CA3AF"
-                multiline
-                value={adminNotes}
-                onChangeText={setAdminNotes}
-              />
-              
-              <TouchableOpacity style={styles.approveBtn} onPress={() => approveAppointment(appointmentModal.id)}>
-                <Text style={styles.approveBtnText}>✓ Approve</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.rejectBtn} onPress={() => rejectAppointment(appointmentModal.id)}>
-                <Text style={styles.rejectBtnText}>✗ Reject</Text>
-              </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.approveBtn} onPress={() => approveAppointment(appointmentModal.id)}>
+                  <Text style={styles.approveBtnText}>✓ Approve</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.rejectBtn} onPress={() => rejectAppointment(appointmentModal.id)}>
+                  <Text style={styles.rejectBtnText}>✗ Reject</Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       )}
 
       {/* Q&A Answer Modal */}
       {qaModal && (
         <Modal visible={true} transparent animationType="slide">
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}>
             <View style={styles.appointmentModalContent}>
               <View style={styles.editModalHeader}>
                 <Text style={styles.editModalTitle}>Reply to Question</Text>
@@ -870,23 +904,25 @@ export default function AdminDashboard({ navigation }) {
                   <MaterialIcons name="close" size={24} color="#111827" />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.appointmentModalUser}>User: {qaModal.username}</Text>
-              <Text style={styles.appointmentModalReason}>Question: {qaModal.question}</Text>
-              
-              <TextInput
-                style={styles.appointmentNotesInput}
-                placeholder="Type your answer here..."
-                placeholderTextColor="#9CA3AF"
-                multiline
-                value={qaAnswer}
-                onChangeText={setQaAnswer}
-              />
-              
-              <TouchableOpacity style={styles.approveBtn} onPress={() => answerQuestion(qaModal.id)}>
-                <Text style={styles.approveBtnText}>✓ Submit Answer</Text>
-              </TouchableOpacity>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.appointmentModalUser}>User: {qaModal.username}</Text>
+                <Text style={styles.appointmentModalReason}>Question: {qaModal.question}</Text>
+                
+                <TextInput
+                  style={styles.appointmentNotesInput}
+                  placeholder="Type your answer here..."
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  value={qaAnswer}
+                  onChangeText={setQaAnswer}
+                />
+                
+                <TouchableOpacity style={styles.approveBtn} onPress={() => answerQuestion(qaModal.id)}>
+                  <Text style={styles.approveBtnText}>✓ Submit Answer</Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       )}
 
@@ -998,59 +1034,77 @@ export default function AdminDashboard({ navigation }) {
           </View>
         </Modal>
       )}
+
+      {/* Success Alert Modal */}
+      {successAlert && (
+        <Modal visible={true} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.successAlertContent}>
+              <View style={styles.successIconCircle}>
+                <MaterialIcons name="check" size={32} color="#FFFFFF" />
+              </View>
+              <Text style={styles.successAlertTitle}>Success!</Text>
+              <Text style={styles.successAlertDesc}>{successAlert}</Text>
+              <TouchableOpacity style={styles.successAlertBtn} onPress={() => setSuccessAlert(null)}>
+                <Text style={styles.successAlertBtnText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F7FA' },
-  header: { backgroundColor: '#1B3B6F', paddingHorizontal: 12, paddingVertical: 10, paddingTop: 50, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#00A8A8', justifyContent: 'center', alignItems: 'center' },
-  avatarText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-  greeting: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', marginBottom: 2 },
-  adminPill: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, backgroundColor: '#00A8A8' },
-  adminText: { color: '#FFFFFF', fontSize: 8, fontWeight: '700', letterSpacing: 0.2 },
-  headerRight: { flexDirection: 'row', gap: 5, alignItems: 'center' },
-  usersBtn: { backgroundColor: '#00A8A8', width: 32, height: 32, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
-  badge: { position: 'absolute', top: -3, right: -3, backgroundColor: '#E74C3C', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 2 },
+  header: { backgroundColor: '#1B3B6F', paddingHorizontal: 20, paddingVertical: 16, paddingTop: 50, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#00A8A8', justifyContent: 'center', alignItems: 'center' },
+  avatarText: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
+  greeting: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  adminPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, backgroundColor: '#00A8A8' },
+  adminText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
+  headerRight: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  usersBtn: { backgroundColor: '#00A8A8', width: 36, height: 36, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  badge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E74C3C', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
   badgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
-  logoutBtn: { backgroundColor: '#00A8A8', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6, height: 32, justifyContent: 'center' },
+  logoutBtn: { backgroundColor: '#00A8A8', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, height: 36, justifyContent: 'center' },
   logoutText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
   tabBar: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
-  tab: { flex: 1, paddingVertical: 10, paddingHorizontal: 6, alignItems: 'center', gap: 3 },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: '#00A8A8' },
+  tab: { flex: 1, paddingVertical: 10, paddingHorizontal: 4, alignItems: 'center', gap: 2 },
+  tabActive: { borderBottomWidth: 3, borderBottomColor: '#00A8A8' },
   tabText: { fontSize: 9, color: '#6B7280', fontWeight: '600' },
   tabTextActive: { color: '#00A8A8', fontWeight: '800' },
-  content: { flex: 1, padding: 12 },
-  statsRow: { flexDirection: 'row', gap: 6, marginBottom: 10 },
-  statCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 8, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
-  statValue: { fontSize: 20, fontWeight: '800', color: '#00A8A8', marginBottom: 2 },
-  statLabel: { fontSize: 9, color: '#6B7280', textAlign: 'center', fontWeight: '600' },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
-  cardTitle: { fontSize: 13, fontWeight: '800', color: '#1B3B6F', marginBottom: 10, letterSpacing: 0.2 },
+  content: { flex: 1, padding: 16 },
+  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  statCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
+  statValue: { fontSize: 28, fontWeight: '800', color: '#00A8A8', marginBottom: 4 },
+  statLabel: { fontSize: 12, color: '#6B7280', textAlign: 'center', fontWeight: '600' },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
+  cardTitle: { fontSize: 17, fontWeight: '800', color: '#1B3B6F', marginBottom: 14, letterSpacing: 0.3 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   filterBtn: { padding: 6, backgroundColor: '#DBEAFE', borderRadius: 5 },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 8, paddingHorizontal: 10, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' },
-  searchInput: { flex: 1, paddingVertical: 10, paddingHorizontal: 6, fontSize: 12, color: '#111827' },
-  progressItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  progressUser: { fontSize: 12, fontWeight: '700', color: '#1B3B6F', marginBottom: 3 },
-  progressBadges: { flexDirection: 'row', gap: 3 },
+  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 10, paddingHorizontal: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E5E7EB' },
+  searchInput: { flex: 1, paddingVertical: 12, paddingHorizontal: 8, fontSize: 14, color: '#111827' },
+  progressItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  progressUser: { fontSize: 15, fontWeight: '700', color: '#1B3B6F', marginBottom: 4 },
+  progressBadges: { flexDirection: 'row', gap: 5 },
   viewBtn: { padding: 6, backgroundColor: '#DBEAFE', borderRadius: 5 },
   removeBtn: { padding: 6, backgroundColor: '#FEE2E2', borderRadius: 5 },
-  badgeGreen: { backgroundColor: '#10B981', color: '#fff', fontSize: 8, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
-  badgeGray: { backgroundColor: '#E5E7EB', color: '#6B7280', fontSize: 8, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
+  badgeGreen: { backgroundColor: '#10B981', color: '#fff', fontSize: 11, fontWeight: '800', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  badgeGray: { backgroundColor: '#E5E7EB', color: '#6B7280', fontSize: 11, fontWeight: '700', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
   addBtn: { backgroundColor: '#00A8A8', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, marginBottom: 8, shadowColor: '#00A8A8', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
   addBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800', textAlign: 'center', letterSpacing: 0.2 },
-  userItem: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  userAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#00A8A8', justifyContent: 'center', alignItems: 'center' },
-  userAvatarText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  userItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  userAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#00A8A8', justifyContent: 'center', alignItems: 'center' },
+  userAvatarText: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
   userInfo: { flex: 1 },
-  userName: { fontSize: 12, fontWeight: '800', color: '#1B3B6F', marginBottom: 2 },
-  userDetail: { fontSize: 10, color: '#6B7280', marginTop: 1 },
-  userLevel: { fontSize: 10, color: '#00A8A8', fontWeight: '700', marginTop: 2 },
+  userName: { fontSize: 15, fontWeight: '800', color: '#1B3B6F', marginBottom: 3 },
+  userDetail: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+  userLevel: { fontSize: 13, color: '#00A8A8', fontWeight: '700', marginTop: 3 },
   contentDesc: { fontSize: 11, color: '#6B7280', textAlign: 'center', marginTop: 6, lineHeight: 16 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center' },
   filterModal: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
   filterHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   filterTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
@@ -1075,8 +1129,8 @@ const styles = StyleSheet.create({
   confirmDeleteText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF', textAlign: 'center' },
   editBtn: { padding: 6, backgroundColor: '#DBEAFE', borderRadius: 5 },
   editModalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '80%', width: '100%', position: 'absolute', bottom: 0 },
-  editModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, paddingBottom: 16, borderBottomWidth: 2, borderBottomColor: '#E5E7EB' },
-  editModalTitle: { fontSize: 24, fontWeight: '800', color: '#111827', flex: 1, letterSpacing: 0.3 },
+  editModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  editModalTitle: { fontSize: 16, fontWeight: '800', color: '#111827', flex: 1 },
   attendanceList: { maxHeight: 400 },
   attendanceItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
   attendanceDate: { fontSize: 14, fontWeight: '700', color: '#1B3B6F' },
@@ -1117,18 +1171,18 @@ const styles = StyleSheet.create({
   reviewBtn: { backgroundColor: '#00A8A8', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 5, marginTop: 5 },
   reviewBtnText: { color: '#FFF', fontSize: 11, fontWeight: '800', textAlign: 'center', letterSpacing: 0.2 },
   noData: { fontSize: 11, color: '#9CA3AF', textAlign: 'center', padding: 12, fontStyle: 'italic' },
-  appointmentModalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 32, maxHeight: '85%', width: '100%', position: 'absolute', bottom: 0, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10 },
-  appointmentModalUser: { fontSize: 20, color: '#1B3B6F', marginBottom: 12, fontWeight: '700' },
-  appointmentModalReason: { fontSize: 18, color: '#6B7280', marginBottom: 20, lineHeight: 26, backgroundColor: '#F9FAFB', padding: 16, borderRadius: 12 },
-  appointmentModalLabel: { fontSize: 18, fontWeight: '700', color: '#1B3B6F', marginBottom: 12, letterSpacing: 0.3 },
-  dateTimeRow: { flexDirection: 'row', gap: 16, marginBottom: 20 },
-  dateTimeBtn: { flex: 1, backgroundColor: '#F9FAFB', padding: 20, borderRadius: 14, borderWidth: 2, borderColor: '#00A8A8', alignItems: 'center', shadowColor: '#00A8A8', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  dateTimeBtnText: { fontSize: 18, fontWeight: '700', color: '#1B3B6F' },
-  appointmentNotesInput: { backgroundColor: '#F9FAFB', padding: 18, borderRadius: 14, borderWidth: 2, borderColor: '#E5E7EB', fontSize: 18, color: '#1B3B6F', minHeight: 100, textAlignVertical: 'top', marginBottom: 20 },
-  approveBtn: { backgroundColor: '#10B981', padding: 20, borderRadius: 14, marginBottom: 14, shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
-  approveBtnText: { color: '#FFF', fontSize: 20, fontWeight: '800', textAlign: 'center', letterSpacing: 0.5 },
-  rejectBtn: { backgroundColor: '#DC2626', padding: 20, borderRadius: 14, shadowColor: '#DC2626', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
-  rejectBtnText: { color: '#FFF', fontSize: 20, fontWeight: '800', textAlign: 'center', letterSpacing: 0.5 },
+  appointmentModalContent: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, maxHeight: '75%', width: '90%', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 },
+  appointmentModalUser: { fontSize: 13, color: '#1B3B6F', marginBottom: 6, fontWeight: '700' },
+  appointmentModalReason: { fontSize: 12, color: '#6B7280', marginBottom: 10, lineHeight: 16, backgroundColor: '#F9FAFB', padding: 10, borderRadius: 8 },
+  appointmentModalLabel: { fontSize: 12, fontWeight: '700', color: '#1B3B6F', marginBottom: 6, marginTop: 4 },
+  dateTimeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  dateTimeBtn: { flex: 1, backgroundColor: '#F9FAFB', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#00A8A8', alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  dateTimeBtnText: { fontSize: 11, fontWeight: '700', color: '#1B3B6F' },
+  appointmentNotesInput: { backgroundColor: '#F9FAFB', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', fontSize: 12, color: '#1B3B6F', minHeight: 70, textAlignVertical: 'top', marginBottom: 10 },
+  approveBtn: { backgroundColor: '#10B981', padding: 12, borderRadius: 10, marginBottom: 8, shadowColor: '#10B981', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 4 },
+  approveBtnText: { color: '#FFF', fontSize: 13, fontWeight: '800', textAlign: 'center' },
+  rejectBtn: { backgroundColor: '#DC2626', padding: 12, borderRadius: 10, shadowColor: '#DC2626', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 4 },
+  rejectBtnText: { color: '#FFF', fontSize: 13, fontWeight: '800', textAlign: 'center' },
   userDetailModalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%', width: '100%', position: 'absolute', bottom: 0 },
   userDetailInfo: { backgroundColor: '#F9FAFB', padding: 16, borderRadius: 12, marginBottom: 16 },
   userDetailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
@@ -1145,4 +1199,12 @@ const styles = StyleSheet.create({
   expandedContent: { backgroundColor: '#FFFFFF', padding: 10, borderRadius: 6, marginTop: -5, marginBottom: 6, borderWidth: 1, borderColor: '#E5E7EB' },
   contentSection: { backgroundColor: '#FFFFFF', padding: 12, borderRadius: 8, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
   contentSectionTitle: { fontSize: 13, fontWeight: '700', color: '#1B3B6F' },
+  successAlertContent: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 24, width: '85%', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 },
+  successIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#10B981', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  successAlertTitle: { fontSize: 18, fontWeight: '800', color: '#1B3B6F', marginBottom: 8 },
+  successAlertDesc: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+  successAlertBtn: { backgroundColor: '#00A8A8', paddingVertical: 12, paddingHorizontal: 32, borderRadius: 10, width: '100%' },
+  successAlertBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', textAlign: 'center' },
+  pendingBadge: { position: 'absolute', top: -6, right: -8, backgroundColor: '#FF6B6B', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+  pendingBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
 });

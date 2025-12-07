@@ -38,14 +38,14 @@ export default function AboutScreen({ navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact Information</Text>
           
-          <TouchableOpacity style={styles.contactItem} onPress={() => openLink('mailto:support@sitthaviruthiyoga.com')}>
+          <TouchableOpacity style={styles.contactItem} onPress={() => openLink('mailto:sitthaviruthiyoga@gmail.com')}>
             <MaterialIcons name="email" size={24} color="#00A8A8" />
             <Text style={styles.contactText}>support@sitthaviruthiyoga.com</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.contactItem} onPress={() => openLink('tel:+1234567890')}>
+          <TouchableOpacity style={styles.contactItem} onPress={() => openLink('tel:+91 0000000000')}>
             <MaterialIcons name="phone" size={24} color="#00A8A8" />
-            <Text style={styles.contactText}>+1 (234) 567-890</Text>
+            <Text style={styles.contactText}>+91 0000000000</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.contactItem} onPress={() => openLink('https://www.sitthaviruthiyoga.com')}>

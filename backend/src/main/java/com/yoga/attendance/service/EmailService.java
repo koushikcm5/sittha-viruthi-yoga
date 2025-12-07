@@ -15,100 +15,93 @@ public class EmailService {
     @Autowired
     private JavaMailSender mailSender;
     
-    public void sendVerificationEmail(String to, String token) {
+    public void sendVerificationOtp(String to, String otp) {
+        System.out.println("\n=== EMAIL VERIFICATION OTP ===");
+        System.out.println("To: " + to);
+        System.out.println("OTP: " + otp);
+        System.out.println("==============================\n");
+        
         try {
-            System.out.println("\n=== EMAIL VERIFICATION ===");
-            System.out.println("To: " + to);
-            System.out.println("Token: " + token);
-            System.out.println("========================\n");
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
             
-            try {
-                MimeMessage message = mailSender.createMimeMessage();
-                MimeMessageHelper helper = new MimeMessageHelper(message, true);
-                
-                helper.setTo(to);
-                helper.setSubject("Verify your Yoga App email");
-                helper.setText(getVerificationEmailTemplate(token), true);
-                
-                mailSender.send(message);
-                System.out.println("Verification email sent to: " + to);
-            } catch (Exception emailError) {
-                System.out.println("Email sending failed: " + emailError.getMessage());
-            }
+            helper.setFrom("kishorekishore2145y@gmail.com");
+            helper.setTo(to);
+            helper.setSubject("Verify your Yoga App email");
+            helper.setText(getVerificationOtpTemplate(otp), true);
+            
+            mailSender.send(message);
+            System.out.println("✓ Verification OTP email sent successfully to: " + to);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to process email", e);
+            System.err.println("✗ Email sending failed: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to send verification email: " + e.getMessage());
         }
     }
     
-    public void sendPasswordResetEmail(String to, String token) {
+    public void sendPasswordResetOtp(String to, String otp) {
+        System.out.println("\n=== PASSWORD RESET OTP ===");
+        System.out.println("To: " + to);
+        System.out.println("OTP: " + otp);
+        System.out.println("==========================\n");
+        
         try {
-            String resetLink = "http://10.10.42.68:9000/reset-password.html?token=" + token;
-            System.out.println("\n=== PASSWORD RESET EMAIL ===");
-            System.out.println("To: " + to);
-            System.out.println("Reset Link: " + resetLink);
-            System.out.println("Token: " + token);
-            System.out.println("============================\n");
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
             
-            try {
-                MimeMessage message = mailSender.createMimeMessage();
-                MimeMessageHelper helper = new MimeMessageHelper(message, true);
-                
-                helper.setTo(to);
-                helper.setSubject("Reset your Yoga App password");
-                helper.setText(getResetEmailTemplate(token), true);
-                
-                mailSender.send(message);
-                System.out.println("Email sent successfully to: " + to);
-            } catch (Exception emailError) {
-                System.out.println("Email sending failed: " + emailError.getMessage());
-                System.out.println("Use the reset link from console output above");
-            }
+            helper.setFrom("kishorekishore2145y@gmail.com");
+            helper.setTo(to);
+            helper.setSubject("Reset your Yoga App password");
+            helper.setText(getResetOtpTemplate(otp), true);
+            
+            mailSender.send(message);
+            System.out.println("✓ Password reset OTP email sent successfully to: " + to);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to process email", e);
+            System.err.println("✗ Email sending failed: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to send password reset email: " + e.getMessage());
         }
     }
     
-    private String getResetEmailTemplate(String token) {
+    private String getResetOtpTemplate(String otp) {
         return "<!DOCTYPE html>" +
                 "<html>" +
                 "<head><style>" +
-                ".token-box { background-color: #f0f0f0; padding: 15px; border-radius: 5px; font-size: 16px; font-weight: bold; text-align: center; margin: 20px 0; color: #000; word-break: break-all; }" +
+                ".otp-box { background-color: #00A8A8; padding: 20px; border-radius: 8px; font-size: 32px; font-weight: bold; text-align: center; margin: 20px 0; color: #FFF; letter-spacing: 8px; }" +
                 "</style></head>" +
                 "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
                 "<h2>Reset Your Password</h2>" +
-                "<p>Copy the token below and paste it in the app to reset your password:</p>" +
-                "<div class='token-box'>" + token + "</div>" +
+                "<p>Your OTP to reset your password is:</p>" +
+                "<div class='otp-box'>" + otp + "</div>" +
                 "<p><strong>Steps:</strong></p>" +
                 "<ol>" +
                 "<li>Open the Yoga App</li>" +
-                "<li>Go to Forgot Password screen</li>" +
-                "<li>Enter your email and click Send Reset Link</li>" +
-                "<li>Copy and paste the token above</li>" +
+                "<li>Enter this OTP in the verification screen</li>" +
                 "<li>Enter your new password</li>" +
                 "</ol>" +
-                "<p>This token will expire in 15 minutes.</p>" +
+                "<p>This OTP will expire in 10 minutes.</p>" +
                 "<p>If you didn't request this, please ignore this email.</p>" +
                 "</body>" +
                 "</html>";
     }
     
-    private String getVerificationEmailTemplate(String token) {
+    private String getVerificationOtpTemplate(String otp) {
         return "<!DOCTYPE html>" +
                 "<html>" +
                 "<head><style>" +
-                ".token-box { background-color: #f0f0f0; padding: 15px; border-radius: 5px; font-size: 16px; font-weight: bold; text-align: center; margin: 20px 0; color: #000; word-break: break-all; }" +
+                ".otp-box { background-color: #00A8A8; padding: 20px; border-radius: 8px; font-size: 32px; font-weight: bold; text-align: center; margin: 20px 0; color: #FFF; letter-spacing: 8px; }" +
                 "</style></head>" +
                 "<body style='font-family: Arial, sans-serif; padding: 20px;'>" +
                 "<h2>Verify Your Email</h2>" +
-                "<p>Copy the token below and paste it in the app to verify your email:</p>" +
-                "<div class='token-box'>" + token + "</div>" +
+                "<p>Your OTP to verify your email is:</p>" +
+                "<div class='otp-box'>" + otp + "</div>" +
                 "<p><strong>Steps:</strong></p>" +
                 "<ol>" +
                 "<li>Open the Yoga App</li>" +
-                "<li>Go to Email Verification screen</li>" +
-                "<li>Paste the token above</li>" +
+                "<li>Enter this OTP in the verification screen</li>" +
                 "<li>Click Verify</li>" +
                 "</ol>" +
+                "<p>This OTP will expire in 10 minutes.</p>" +
                 "<p>If you didn't register, please ignore this email.</p>" +
                 "</body>" +
                 "</html>";

@@ -47,9 +47,13 @@ public class User {
     private String resetToken;
     private LocalDateTime resetTokenExpiry;
     
-    private String verificationToken;
+    private String verificationOtp;
+    private LocalDateTime verificationOtpExpiry;
     @Column(nullable = false)
     private Boolean emailVerified = false;
+    
+    private String resetOtp;
+    private LocalDateTime resetOtpExpiry;
     
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Attendance> attendances;

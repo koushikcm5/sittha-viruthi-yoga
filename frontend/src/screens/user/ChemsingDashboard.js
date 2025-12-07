@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
-import SecureVideoPlayer from '../../components/common/SecureVideoPlayer';
+import UniversalVideoPlayer from '../../components/common/UniversalVideoPlayer';
 import { notificationService } from '../../services/notificationService';
-
-const API_URL = 'http://10.10.42.68:9000/api';
+import { API_URL } from '../../../config';
 
 export default function ChemsingDashboard({ navigation, route }) {
   const [user, setUser] = useState({ name: '', level: 1 });
@@ -72,31 +71,47 @@ export default function ChemsingDashboard({ navigation, route }) {
   }, [activeTab]);
 
   const loadHabits = async () => {
-    const hRes = await fetch(`${API_URL}/content/habits`);
-    setHabits(await hRes.json());
+    try {
+      const hRes = await fetch(`${API_URL}/content/habits`);
+      const habitsData = await hRes.json();
+      setHabits(Array.isArray(habitsData) ? habitsData : []);
+    } catch (error) {
+      console.error('Error loading habits:', error);
+      setHabits([]);
+    }
   };
 
   const loadDashboard = async () => {
-    const username = await AsyncStorage.getItem('username');
-    const res = await fetch(`${API_URL}/content/user/${username}`);
-    const data = await res.json();
-    
-    setUser({ name: username, level: data.level });
-    setProgress(((data.currentVideoIndex / data.totalVideos) * 100) || 0);
-    
-    const rRes = await fetch(`${API_URL}/content/routines`);
-    setRoutines(await rRes.json());
-    
-    const hRes = await fetch(`${API_URL}/content/habits`);
-    setHabits(await hRes.json());
-    
-    // Get days completed
-    const pRes = await fetch(`${API_URL}/content/progress/${username}`);
-    const pData = await pRes.json();
-    // Calculate days from attendance records
-    const aRes = await fetch(`${API_URL}/attendance/user/${username}`);
-    const aData = await aRes.json();
-    setDaysCompleted(Array.isArray(aData) ? aData.filter(a => a.attended).length : 0);
+    try {
+      const username = await AsyncStorage.getItem('username');
+      const res = await fetch(`${API_URL}/content/user/${username}`);
+      const data = await res.json();
+      
+      setUser({ name: username, level: data?.level || 1 });
+      setProgress(((data?.currentVideoIndex / data?.totalVideos) * 100) || 0);
+      
+      const rRes = await fetch(`${API_URL}/content/routines`);
+      const routinesData = await rRes.json();
+      setRoutines(Array.isArray(routinesData) ? routinesData : []);
+      
+      const hRes = await fetch(`${API_URL}/content/habits`);
+      const habitsData = await hRes.json();
+      setHabits(Array.isArray(habitsData) ? habitsData : []);
+      
+      // Get days completed
+      const pRes = await fetch(`${API_URL}/content/progress/${username}`);
+      const pData = await pRes.json();
+      // Calculate days from attendance records
+      const aRes = await fetch(`${API_URL}/attendance/user/${username}`);
+      const aData = await aRes.json();
+      setDaysCompleted(Array.isArray(aData) ? aData.filter(a => a?.attended).length : 0);
+    } catch (error) {
+      console.error('Error loading dashboard:', error);
+      setUser({ name: 'User', level: 1 });
+      setRoutines([]);
+      setHabits([]);
+      setDaysCompleted(0);
+    }
   };
 
   const loadManifestationVideo = async () => {
@@ -162,6 +177,9 @@ export default function ChemsingDashboard({ navigation, route }) {
         body: JSON.stringify({ username, question: newQuestion })
       });
       if (res.ok) {
+        // Notify admin of new question
+        await notificationService.notifyAdminNewQuestion('admin', { username, question: newQuestion });
+        
         setQaModal(false);
         setNewQuestion('');
         setCustomSuccessModal('Your question has been submitted! Admin will reply soon.');
@@ -189,6 +207,9 @@ export default function ChemsingDashboard({ navigation, route }) {
       const data = await res.json();
       
       if (res.ok) {
+        // Notify admin of new appointment request
+        await notificationService.notifyAdminNewAppointment('admin', { username, reason: appointmentReason });
+        
         setAppointmentModal(false);
         setAppointmentReason('');
         setCustomSuccessModal('Appointment request submitted! Admin will review and schedule it.');
@@ -216,6 +237,9 @@ export default function ChemsingDashboard({ navigation, route }) {
   const loadWorkshops = async (level) => {
     try {
       const wRes = await fetch(`${API_URL}/content/workshops/${level}`);
+      if (!wRes.ok) {
+        throw new Error(`HTTP ${wRes.status}`);
+      }
       const data = await wRes.json();
       setWorkshops(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -227,9 +251,13 @@ export default function ChemsingDashboard({ navigation, route }) {
   const loadSessionWorkshops = async (level) => {
     try {
       const sRes = await fetch(`${API_URL}/content/workshops/sessions/${level}`);
+      if (!sRes.ok) {
+        throw new Error(`HTTP ${sRes.status}`);
+      }
       const data = await sRes.json();
       setSessionWorkshops(Array.isArray(data) ? data : []);
     } catch (error) {
+      console.error('Error loading session workshops:', error);
       setSessionWorkshops([]);
     }
   };
@@ -268,22 +296,32 @@ export default function ChemsingDashboard({ navigation, route }) {
   const [customSuccessModal, setCustomSuccessModal] = useState(null);
   const [customErrorModal, setCustomErrorModal] = useState(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showAppointments, setShowAppointments] = useState(false);
+  const [showQA, setShowQA] = useState(false);
 
   const completeVideo = async (videoId) => {
     setVideoCompletionModal(videoId);
   };
 
   const confirmVideoCompletion = async () => {
-    const username = await AsyncStorage.getItem('username');
-    await fetch(`${API_URL}/content/complete-video`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, videoId: videoCompletionModal.toString() })
-    });
-    setVideoCompletionModal(null);
-    setVideoCompleted(true);
-    setActiveTab('routine');
-    loadDashboard();
+    try {
+      const username = await AsyncStorage.getItem('username');
+      const response = await fetch(`${API_URL}/content/complete-video`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, videoId: videoCompletionModal.toString() })
+      });
+      if (!response.ok) {
+        throw new Error('Failed to mark video as complete');
+      }
+      setVideoCompletionModal(null);
+      setVideoCompleted(true);
+      setActiveTab('routine');
+      loadDashboard();
+    } catch (error) {
+      console.error('Error completing video:', error);
+      setErrorModal('Failed to mark video as complete. Please try again.');
+    }
   };
 
   const submitHabit = async (habitId, answer) => {
@@ -301,8 +339,20 @@ export default function ChemsingDashboard({ navigation, route }) {
     const username = await AsyncStorage.getItem('username');
     try {
       if (attended) {
-        // Validation already done in submit button
-        // Just mark all progress as completed for Present
+        // Validate all tasks are completed before marking present
+        if (!videoCompleted || !routineCompleted) {
+          setErrorModal('Please complete all daily tasks before marking attendance as Present');
+          setCompletionModal(false);
+          return;
+        }
+        
+        const allHabitsCompleted = Array.isArray(habits) && habits.length > 0 ? 
+          habits.every(h => completedSteps[`habit_${h?.id}`]) : true;
+        if (!allHabitsCompleted) {
+          setErrorModal('Please complete all habits before marking attendance as Present');
+          setCompletionModal(false);
+          return;
+        }
         
         // Mark all progress as completed for Present
         await fetch(`${API_URL}/content/complete-routine`, {
@@ -334,6 +384,9 @@ export default function ChemsingDashboard({ navigation, route }) {
         setErrorModal(data.error || 'Attendance already marked for today');
         return;
       }
+      
+      // Send notification
+      await notificationService.notifyAttendanceMarked(username, attended ? 'present' : 'absent');
       
       setSuccessModal(attended ? 'Present' : 'Absent');
       await loadDashboard();
@@ -466,25 +519,25 @@ export default function ChemsingDashboard({ navigation, route }) {
               {selectedLevel && <Text style={styles.workshopSubtitle}>Level {selectedLevel} - {getLevelName(selectedLevel)}</Text>}
               {Array.isArray(workshops) && workshops.length > 0 ? (
                 workshops.map((workshop) => (
-                  <View key={workshop.id} style={styles.premiumWorkshopCard}>
+                  <View key={workshop?.id || Math.random()} style={styles.premiumWorkshopCard}>
                     <View style={styles.workshopBadgeRow}>
-                      <View style={[styles.levelBadge, { backgroundColor: getLevelColor(workshop.level) }]}>
-                        <Text style={styles.levelBadgeText}>Level {workshop.level}</Text>
+                      <View style={[styles.levelBadge, { backgroundColor: getLevelColor(workshop?.level || 1) }]}>
+                        <Text style={styles.levelBadgeText}>Level {workshop?.level || 1}</Text>
                       </View>
                       <Text style={styles.workshopTime}>
-                        {new Date(workshop.startTime).toLocaleString('en-US', {
+                        {workshop?.startTime ? new Date(workshop.startTime).toLocaleString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit'
-                        })}
+                        }) : 'TBD'}
                       </Text>
                     </View>
-                    <Text style={styles.premiumWorkshopTitle}>{workshop.title}</Text>
-                    <Text style={styles.workshopDesc}>{workshop.description}</Text>
+                    <Text style={styles.premiumWorkshopTitle}>{workshop?.title || 'Workshop'}</Text>
+                    <Text style={styles.workshopDesc}>{workshop?.description || ''}</Text>
                     <TouchableOpacity 
                       style={styles.premiumJoinBtn} 
-                      onPress={() => Linking.openURL(workshop.link)}>
+                      onPress={() => workshop?.link && Linking.openURL(workshop.link)}>
                       <MaterialIcons name="open-in-new" size={20} color="#FFF" />
                       <Text style={styles.joinBtnText}>Join Workshop</Text>
                     </TouchableOpacity>
@@ -858,26 +911,29 @@ export default function ChemsingDashboard({ navigation, route }) {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Habit Tracker</Text>
               <Text style={styles.habitSubtitle}>Complete your daily habits</Text>
-              {Array.isArray(habits) && habits.map((habit) => (
-                <View key={habit.id} style={styles.habitItem}>
+              {Array.isArray(habits) && habits.length > 0 ? habits.map((habit) => (
+                <View key={habit?.id || Math.random()} style={styles.habitItem}>
                   <View style={styles.habitContent}>
-                    <Text style={styles.habitTitle}>{habit.name}</Text>
-                    <Text style={styles.habitDesc}>{habit.description}</Text>
+                    <Text style={styles.habitTitle}>{habit?.name || 'Habit'}</Text>
+                    <Text style={styles.habitDesc}>{habit?.description || ''}</Text>
                   </View>
                   <TouchableOpacity 
-                    style={[styles.habitCheck, completedSteps[`habit_${habit.id}`] && styles.habitCheckDone]} 
-                    onPress={() => setCompletedSteps({...completedSteps, [`habit_${habit.id}`]: true})}>
-                    <Text style={styles.habitCheckText}>{completedSteps[`habit_${habit.id}`] ? '✓' : '○'}</Text>
+                    style={[styles.habitCheck, completedSteps[`habit_${habit?.id}`] && styles.habitCheckDone]} 
+                    onPress={() => setCompletedSteps({...completedSteps, [`habit_${habit?.id}`]: true})}>
+                    <Text style={styles.habitCheckText}>{completedSteps[`habit_${habit?.id}`] ? '✓' : '○'}</Text>
                   </TouchableOpacity>
                 </View>
-              ))}
+              )) : (
+                <Text style={styles.noVideos}>No habits available yet</Text>
+              )}
             </View>
 
             <TouchableOpacity style={styles.submitBtn} onPress={() => {
               const incompleteTasks = [];
               if (!videoCompleted) incompleteTasks.push('Cleansing Video');
               if (!routineCompleted) incompleteTasks.push('Daily Routine (7 Steps)');
-              const allHabitsCompleted = habits.every(h => completedSteps[`habit_${h.id}`]);
+              const allHabitsCompleted = Array.isArray(habits) && habits.length > 0 ? 
+                habits.every(h => completedSteps[`habit_${h?.id}`]) : true;
               if (!allHabitsCompleted) incompleteTasks.push('Habit Tracker');
               
               if (incompleteTasks.length > 0) {
@@ -893,64 +949,77 @@ export default function ChemsingDashboard({ navigation, route }) {
 
         {activeTab === 'support' && (
           <View>
-            {/* Appointments Section - MOVED TO TOP */}
+            {/* Appointments Section */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Appointments</Text>
-              <Text style={styles.habitSubtitle}>Book a session with our instructors</Text>
+              <TouchableOpacity 
+                style={styles.dropdownHeader} 
+                onPress={() => setShowAppointments(!showAppointments)}>
+                <View style={styles.dropdownTitleRow}>
+                  <MaterialIcons name="event" size={24} color="#00A8A8" />
+                  <Text style={styles.cardTitle}>Appointments ({Array.isArray(appointments) ? appointments.length : 0})</Text>
+                </View>
+                <MaterialIcons name={showAppointments ? "expand-less" : "expand-more"} size={24} color="#666" />
+              </TouchableOpacity>
               
-              {Array.isArray(appointments) && appointments.length > 0 ? (
-                appointments.map((apt) => (
-                  <TouchableOpacity 
-                    key={apt.id} 
-                    style={[
-                      styles.workshopCard,
-                      { borderColor: apt.status === 'APPROVED' ? '#27AE60' : apt.status === 'REJECTED' ? '#E74C3C' : '#FF9F43' }
-                    ]}
-                    onPress={() => setExpandedAppointment(expandedAppointment === apt.id ? null : apt.id)}>
-                    <View style={styles.workshopHeader}>
-                      {apt.scheduledDate && apt.status === 'APPROVED' && (
-                        <Text style={styles.workshopTime}>
-                          {new Date(apt.scheduledDate).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </Text>
-                      )}
-                      <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-                        <View style={[
-                          styles.levelBadge,
-                          { backgroundColor: apt.status === 'APPROVED' ? '#27AE60' : apt.status === 'REJECTED' ? '#E74C3C' : '#FF9F43' }
-                        ]}>
-                          <Text style={styles.levelBadgeText}>{apt.status}</Text>
+              {showAppointments && (
+                <View style={styles.dropdownContent}>
+                  <Text style={styles.habitSubtitle}>Book a session with our instructors</Text>
+                  
+                  {Array.isArray(appointments) && appointments.length > 0 ? (
+                    appointments.map((apt) => (
+                      <TouchableOpacity 
+                        key={apt.id} 
+                        style={[
+                          styles.workshopCard,
+                          { borderColor: apt.status === 'APPROVED' ? '#27AE60' : apt.status === 'REJECTED' ? '#E74C3C' : '#FF9F43' }
+                        ]}
+                        onPress={() => setExpandedAppointment(expandedAppointment === apt.id ? null : apt.id)}>
+                        <View style={styles.workshopHeader}>
+                          {apt.scheduledDate && apt.status === 'APPROVED' && (
+                            <Text style={styles.workshopTime}>
+                              {new Date(apt.scheduledDate).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </Text>
+                          )}
+                          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+                            <View style={[
+                              styles.levelBadge,
+                              { backgroundColor: apt.status === 'APPROVED' ? '#27AE60' : apt.status === 'REJECTED' ? '#E74C3C' : '#FF9F43' }
+                            ]}>
+                              <Text style={styles.levelBadgeText}>{apt.status}</Text>
+                            </View>
+                            <MaterialIcons name={expandedAppointment === apt.id ? "expand-less" : "expand-more"} size={24} color="#666" />
+                          </View>
                         </View>
-                        <MaterialIcons name={expandedAppointment === apt.id ? "expand-less" : "expand-more"} size={24} color="#666" />
-                      </View>
-                    </View>
-                    {expandedAppointment === apt.id ? (
-                      <View style={styles.expandedContent}>
-                        <Text style={styles.workshopTitle}>Appointment Request</Text>
-                        <Text style={styles.workshopDesc}>{apt.reason}</Text>
-                        {apt.adminNotes && (
-                          <Text style={[styles.workshopDesc, {fontStyle: 'italic', color: '#00A8A8'}]}>Note: {apt.adminNotes}</Text>
+                        {expandedAppointment === apt.id ? (
+                          <View style={styles.expandedContent}>
+                            <Text style={styles.workshopTitle}>Appointment Request</Text>
+                            <Text style={styles.workshopDesc}>{apt.reason}</Text>
+                            {apt.adminNotes && (
+                              <Text style={[styles.workshopDesc, {fontStyle: 'italic', color: '#00A8A8'}]}>Note: {apt.adminNotes}</Text>
+                            )}
+                          </View>
+                        ) : (
+                          <Text style={styles.workshopTitle}>Appointment Request</Text>
                         )}
-                      </View>
-                    ) : (
-                      <Text style={styles.workshopTitle}>Appointment Request</Text>
-                    )}
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <View style={styles.appointmentBox}>
+                      <MaterialIcons name="event" size={48} color="#00A8A8" style={{alignSelf: 'center', marginBottom: 12}} />
+                      <Text style={styles.appointmentText}>No appointments yet. Schedule a one-on-one session with our experienced instructors for personalized guidance.</Text>
+                    </View>
+                  )}
+                  
+                  <TouchableOpacity style={styles.submitBtn} onPress={() => setAppointmentModal(true)}>
+                    <Text style={styles.submitBtnText}>Request New Appointment</Text>
                   </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.appointmentBox}>
-                  <MaterialIcons name="event" size={48} color="#00A8A8" style={{alignSelf: 'center', marginBottom: 12}} />
-                  <Text style={styles.appointmentText}>No appointments yet. Schedule a one-on-one session with our experienced instructors for personalized guidance.</Text>
                 </View>
               )}
-              
-              <TouchableOpacity style={styles.submitBtn} onPress={() => setAppointmentModal(true)}>
-                <Text style={styles.submitBtnText}>Request New Appointment</Text>
-              </TouchableOpacity>
             </View>
 
             {/* Session Workshops */}
@@ -989,61 +1058,74 @@ export default function ChemsingDashboard({ navigation, route }) {
 
             {/* Q&A Section */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Questions & Answers</Text>
-              <Text style={styles.habitSubtitle}>Ask questions and get replies from admin</Text>
+              <TouchableOpacity 
+                style={styles.dropdownHeader} 
+                onPress={() => setShowQA(!showQA)}>
+                <View style={styles.dropdownTitleRow}>
+                  <MaterialIcons name="question-answer" size={24} color="#00A8A8" />
+                  <Text style={styles.cardTitle}>Questions & Answers ({Array.isArray(qaList) ? qaList.length : 0})</Text>
+                </View>
+                <MaterialIcons name={showQA ? "expand-less" : "expand-more"} size={24} color="#666" />
+              </TouchableOpacity>
               
-              {Array.isArray(qaList) && qaList.length > 0 ? (
-                qaList.map((qa) => (
-                  <TouchableOpacity 
-                    key={qa.id} 
-                    style={[
-                      styles.qaCard,
-                      { borderLeftColor: qa.status === 'ANSWERED' ? '#10B981' : '#FF9F43' }
-                    ]}
-                    onPress={() => setExpandedQA(expandedQA === qa.id ? null : qa.id)}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <Text style={styles.qaCardLabel}>Your Question:</Text>
-                      <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-                        <View style={[
-                          styles.qaBadge,
-                          { backgroundColor: qa.status === 'ANSWERED' ? '#10B981' : '#FF9F43' }
-                        ]}>
-                          <Text style={styles.qaBadgeText}>{qa.status}</Text>
-                        </View>
-                        <MaterialIcons name={expandedQA === qa.id ? "expand-less" : "expand-more"} size={24} color="#666" />
-                      </View>
-                    </View>
-                    {expandedQA === qa.id ? (
-                      <View style={styles.expandedContent}>
-                        <Text style={styles.qaCardQuestion}>{qa.question}</Text>
-                        <Text style={styles.qaCardDate}>
-                          Asked: {new Date(qa.createdAt).toLocaleString()}
-                        </Text>
-                        {qa.answer && (
-                          <View style={styles.qaAnswerBox}>
-                            <Text style={styles.qaAnswerLabel}>Admin Reply:</Text>
-                            <Text style={styles.qaAnswerText}>{qa.answer}</Text>
-                            <Text style={styles.qaAnswerDate}>
-                              Replied: {new Date(qa.answeredAt).toLocaleString()}
-                            </Text>
+              {showQA && (
+                <View style={styles.dropdownContent}>
+                  <Text style={styles.habitSubtitle}>Ask questions and get replies from admin</Text>
+                  
+                  {Array.isArray(qaList) && qaList.length > 0 ? (
+                    qaList.map((qa) => (
+                      <TouchableOpacity 
+                        key={qa.id} 
+                        style={[
+                          styles.qaCard,
+                          { borderLeftColor: qa.status === 'ANSWERED' ? '#10B981' : '#FF9F43' }
+                        ]}
+                        onPress={() => setExpandedQA(expandedQA === qa.id ? null : qa.id)}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <Text style={styles.qaCardLabel}>Your Question:</Text>
+                          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+                            <View style={[
+                              styles.qaBadge,
+                              { backgroundColor: qa.status === 'ANSWERED' ? '#10B981' : '#FF9F43' }
+                            ]}>
+                              <Text style={styles.qaBadgeText}>{qa.status}</Text>
+                            </View>
+                            <MaterialIcons name={expandedQA === qa.id ? "expand-less" : "expand-more"} size={24} color="#666" />
                           </View>
+                        </View>
+                        {expandedQA === qa.id ? (
+                          <View style={styles.expandedContent}>
+                            <Text style={styles.qaCardQuestion}>{qa.question}</Text>
+                            <Text style={styles.qaCardDate}>
+                              Asked: {new Date(qa.createdAt).toLocaleString()}
+                            </Text>
+                            {qa.answer && (
+                              <View style={styles.qaAnswerBox}>
+                                <Text style={styles.qaAnswerLabel}>Admin Reply:</Text>
+                                <Text style={styles.qaAnswerText}>{qa.answer}</Text>
+                                <Text style={styles.qaAnswerDate}>
+                                  Replied: {new Date(qa.answeredAt).toLocaleString()}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        ) : (
+                          <Text style={styles.qaCardQuestion} numberOfLines={1}>{qa.question}</Text>
                         )}
-                      </View>
-                    ) : (
-                      <Text style={styles.qaCardQuestion} numberOfLines={1}>{qa.question}</Text>
-                    )}
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <View style={styles.appointmentBox}>
+                      <MaterialIcons name="question-answer" size={48} color="#00A8A8" style={{alignSelf: 'center', marginBottom: 12}} />
+                      <Text style={styles.appointmentText}>No questions yet. Ask your questions and get personalized answers from admin.</Text>
+                    </View>
+                  )}
+                  
+                  <TouchableOpacity style={styles.submitBtn} onPress={() => setQaModal(true)}>
+                    <Text style={styles.submitBtnText}>Ask New Question</Text>
                   </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.appointmentBox}>
-                  <MaterialIcons name="question-answer" size={48} color="#00A8A8" style={{alignSelf: 'center', marginBottom: 12}} />
-                  <Text style={styles.appointmentText}>No questions yet. Ask your questions and get personalized answers from admin.</Text>
                 </View>
               )}
-              
-              <TouchableOpacity style={styles.submitBtn} onPress={() => setQaModal(true)}>
-                <Text style={styles.submitBtnText}>Ask New Question</Text>
-              </TouchableOpacity>
             </View>
 
             {/* FAQ Section */}
@@ -1533,13 +1615,9 @@ Note: Select "Absent" if you didn't complete the tasks.</Text>
       )}
 
       {playingVideo && (
-        <SecureVideoPlayer
+        <UniversalVideoPlayer
           videoUrl={playingVideo}
           onClose={() => setPlayingVideo(null)}
-          onComplete={() => {
-            setPlayingVideo(null);
-            setVideoCompleted(true);
-          }}
         />
       )}
 
@@ -1662,8 +1740,8 @@ const styles = StyleSheet.create({
   habitItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 12, backgroundColor: '#F6F7FB', borderRadius: 12, marginBottom: 8 },
   habitTitle: { fontSize: 14, fontWeight: '700', color: '#1B3B6F' },
   habitSchedule: { fontSize: 12, color: '#666', marginTop: 2 },
-  bottomNav: { flexDirection: 'row', backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e0e0e0', paddingVertical: 8 },
-  navItem: { flex: 1, alignItems: 'center', paddingVertical: 4 },
+  bottomNav: { flexDirection: 'row', backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e0e0e0', paddingVertical: 12, paddingBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 8 },
+  navItem: { flex: 1, alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4 },
   navIcon: { fontSize: 24, marginBottom: 2 },
   navLabel: { fontSize: 10, color: '#999' },
   navActive: { color: '#00A8A8' },
@@ -1675,11 +1753,11 @@ const styles = StyleSheet.create({
   qaSection: { marginBottom: 20 },
   qaTitle: { fontSize: 16, fontWeight: '700', color: '#1B3B6F', marginBottom: 12, textAlign: 'center' },
   qaButtons: { flexDirection: 'row', gap: 12, justifyContent: 'center', alignItems: 'center' },
-  yesBtn: { flex: 1, backgroundColor: '#27AE60', paddingVertical: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  noBtn: { flex: 1, backgroundColor: '#E74C3C', paddingVertical: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  qaText: { color: '#fff', fontSize: 14, fontWeight: '700', textAlign: 'center' },
-  closeBtn: { backgroundColor: '#f0f0f0', paddingVertical: 12, borderRadius: 8 },
-  closeBtnWithMargin: { backgroundColor: '#f0f0f0', paddingVertical: 10, borderRadius: 8, marginTop: 12 },
+  yesBtn: { flex: 1, backgroundColor: '#27AE60', paddingVertical: 12, paddingHorizontal: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  noBtn: { flex: 1, backgroundColor: '#E74C3C', paddingVertical: 12, paddingHorizontal: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  qaText: { color: '#fff', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  closeBtn: { backgroundColor: '#f0f0f0', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8 },
+  closeBtnWithMargin: { backgroundColor: '#f0f0f0', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, marginTop: 12 },
   closeBtnText: { color: '#666', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   fab: { position: 'absolute', bottom: 80, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#D4A537', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
   fabText: { fontSize: 24 },
@@ -1709,7 +1787,7 @@ const styles = StyleSheet.create({
   habitCheckDone: { backgroundColor: '#10B981', borderColor: '#10B981' },
   habitCheckText: { fontSize: 20, color: '#00A8A8', fontWeight: '800' },
   qaInput: { backgroundColor: '#F5F7FA', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', fontSize: 13, color: '#1B3B6F', minHeight: 80, textAlignVertical: 'top', marginBottom: 12 },
-  submitBtn: { backgroundColor: '#00A8A8', padding: 14, borderRadius: 10, marginTop: 8, marginBottom: 80 },
+  submitBtn: { backgroundColor: '#00A8A8', padding: 16, borderRadius: 10, marginTop: 8, marginBottom: 100 },
   submitBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', textAlign: 'center' },
   workshopSubtitle: { fontSize: 12, color: '#999', marginBottom: 12 },
   workshopCard: { backgroundColor: '#F5F7FA', padding: 12, borderRadius: 10, marginBottom: 10, borderWidth: 2, borderColor: '#00A8A8' },
@@ -1866,5 +1944,22 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  dropdownTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dropdownContent: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
 });

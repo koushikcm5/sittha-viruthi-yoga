@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingVi
 import { MaterialIcons } from '@expo/vector-icons';
 import { authAPI } from '../../services/api';
 import { validateEmail, validatePhone, validatePassword, validateUsername, validateName } from '../../utils/validation';
+import { notificationService } from '../../services/notificationService';
 
 export default function RegisterScreen({ navigation }) {
   const [name, setName] = useState('');
@@ -13,6 +14,7 @@ export default function RegisterScreen({ navigation }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorModal, setErrorModal] = useState(null);
+  const [successModal, setSuccessModal] = useState(false);
 
 
   const handleRegister = async () => {
@@ -59,7 +61,9 @@ export default function RegisterScreen({ navigation }) {
     setLoading(true);
     try {
       await authAPI.register(name, username, email, phone, password);
-      navigation.navigate('VerifyEmail', { email });
+      // Send welcome notification
+      await notificationService.notifyRegistrationSuccess(username);
+      setSuccessModal(true);
     } catch (error) {
       setErrorModal(error.message);
     } finally {
@@ -177,7 +181,22 @@ export default function RegisterScreen({ navigation }) {
         </Modal>
       )}
 
-
+      {successModal && (
+        <Modal visible={true} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.successIconCircle}>
+                <MaterialIcons name="check" size={40} color="#FFFFFF" />
+              </View>
+              <Text style={styles.modalTitle}>Registration Successful!</Text>
+              <Text style={styles.modalDesc}>Your account has been created successfully. Please wait for admin approval to access the app.</Text>
+              <TouchableOpacity style={styles.modalBtn} onPress={() => { setSuccessModal(false); navigation.navigate('Login'); }}>
+                <Text style={styles.modalBtnText}>Go to Login</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }

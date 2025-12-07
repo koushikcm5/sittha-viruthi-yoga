@@ -8,6 +8,7 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorModal, setErrorModal] = useState(null);
+  const [pendingModal, setPendingModal] = useState(false);
 
   const handleLogin = async () => {
     if (!username || !password) {
@@ -18,17 +19,21 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       const data = await authAPI.login(username, password);
+      console.log('Login response:', data);
+      console.log('User role:', data.role);
       
       if (data.role === 'ADMIN') {
+        console.log('Navigating to AdminDashboard');
         navigation.navigate('AdminDashboard');
       } else {
+        console.log('Navigating to ChemsingDashboard');
         navigation.navigate('ChemsingDashboard', { username: data.username, name: data.name });
       }
     } catch (error) {
       if (error.message === 'EMAIL_NOT_VERIFIED') {
         setErrorModal('Please verify your email before logging in. Check your inbox for the verification token.');
       } else if (error.message === 'PENDING_APPROVAL') {
-        setErrorModal('Your account is pending admin approval. Please wait for approval before logging in.');
+        setPendingModal(true);
       } else {
         setErrorModal(error.message || 'Login failed. Please check your credentials.');
       }
@@ -102,10 +107,32 @@ export default function LoginScreen({ navigation }) {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <MaterialIcons name="error" size={64} color="#EF4444" style={{alignSelf: 'center', marginBottom: 16}} />
-              <Text style={styles.modalTitle}>Enter Valid Field</Text>
+              <Text style={styles.modalTitle}>{errorModal.includes('Pending') ? 'Account Pending' : 'Enter Valid Field'}</Text>
               <Text style={styles.modalDesc}>{errorModal}</Text>
               <TouchableOpacity style={styles.modalBtn} onPress={() => setErrorModal(null)}>
                 <Text style={styles.modalBtnText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {pendingModal && (
+        <Modal visible={true} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.pendingModalContent}>
+              <View style={styles.pendingIconCircle}>
+                <MaterialIcons name="hourglass-empty" size={40} color="#FF9800" />
+              </View>
+              <Text style={styles.pendingModalTitle}>Account Pending Approval</Text>
+              <Text style={styles.pendingModalDesc}>
+                Your registration is under review by our admin team. You will be able to login once your account is approved.
+              </Text>
+              <Text style={styles.pendingModalNote}>
+                This usually takes 24-48 hours. Thank you for your patience.
+              </Text>
+              <TouchableOpacity style={styles.pendingModalBtn} onPress={() => setPendingModal(false)}>
+                <Text style={styles.pendingModalBtnText}>Understood</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -264,6 +291,57 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   modalBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  pendingModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 32,
+    width: '88%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  pendingIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFF3E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  pendingModalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1B3B6F',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  pendingModalDesc: {
+    fontSize: 15,
+    color: '#4B5563',
+    marginBottom: 12,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  pendingModalNote: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 24,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  pendingModalBtn: {
+    backgroundColor: '#FF9800',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    width: '100%',
+  },
+  pendingModalBtnText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',

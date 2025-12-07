@@ -2,7 +2,6 @@ package com.yoga.attendance.controller;
 
 import com.yoga.attendance.dto.*;
 import com.yoga.attendance.service.AuthService;
-import com.yoga.attendance.service.PasswordResetService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,9 +15,6 @@ public class AuthController {
     
     @Autowired
     private AuthService authService;
-    
-    @Autowired
-    private PasswordResetService passwordResetService;
     
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
@@ -41,18 +37,20 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
         try {
-            passwordResetService.initiatePasswordReset(request.getEmail());
-            return ResponseEntity.ok(Map.of("message", "Password reset email sent successfully"));
+            return ResponseEntity.ok(authService.forgotPassword(request.getEmail()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
     
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
         try {
-            passwordResetService.resetPassword(request.getToken(), request.getNewPassword());
-            return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
+            return ResponseEntity.ok(authService.resetPassword(
+                request.get("email"), 
+                request.get("otp"), 
+                request.get("newPassword")
+            ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -85,21 +83,4 @@ public class AuthController {
         }
     }
     
-    @GetMapping("/verify-email")
-    public ResponseEntity<?> verifyEmail(@RequestParam String token) {
-        try {
-            return ResponseEntity.ok(authService.verifyEmail(token));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
-    
-    @PostMapping("/resend-verification")
-    public ResponseEntity<?> resendVerification(@RequestBody Map<String, String> request) {
-        try {
-            return ResponseEntity.ok(authService.resendVerification(request.get("email")));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
 }

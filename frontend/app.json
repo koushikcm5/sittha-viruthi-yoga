@@ -4,49 +4,46 @@
     "slug": "sitthaviruthi-yoga",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1B3B6F"
+    },
+    "jsEngine": "hermes",
     "userInterfaceStyle": "light",
     "platforms": [
       "android",
       "ios"
     ],
     "assetBundlePatterns": [
-      "**/*"
+      "assets/images/**",
+      "assets/img/**",
+      "assets/fonts/**"
     ],
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.sitthaviruthi.yoga",
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1B3B6F"
       },
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "data": [
-            {
-              "scheme": "myapp"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
-        },
-        {
-          "action": "VIEW",
-          "data": [
-            {
-              "scheme": "myapp"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
-        }
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
       ],
-      "package": "com.anonymous.sitthaviruthiyoga"
+      "enableProguardInReleaseBuilds": true,
+      "enableShrinkResourcesInReleaseBuilds": true
     },
-    "scheme": "myapp"
+    "scheme": "myapp",
+    "extra": {
+      "eas": {
+        "projectId": "cabc6986-08fa-4b9e-b76c-8456828b6442"
+      }
+    }
   }
 }

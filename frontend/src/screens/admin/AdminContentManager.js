@@ -3,8 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialIcons } from '@expo/vector-icons';
-
-const API_URL = 'http://10.10.42.68:9000/api';
+import { contentAPI } from '../../services/api';
 
 export default function AdminContentManager({ navigation, route }) {
   const [activeTab, setActiveTab] = useState(route.params?.initialTab || 'videos');
@@ -50,9 +49,8 @@ export default function AdminContentManager({ navigation, route }) {
 
   const loadVideos = async () => {
     try {
-      const res = await fetch(`${API_URL}/content/videos`);
-      const data = await res.json();
-      setVideos(Array.isArray(data) ? data : []);
+      const data = await contentAPI.getVideos();
+      setVideos(data);
     } catch (error) {
       console.log('Error loading videos:', error);
       setVideos([]);
@@ -61,17 +59,11 @@ export default function AdminContentManager({ navigation, route }) {
 
   const loadManifestationVideo = async () => {
     try {
-      const res = await fetch(`${API_URL}/content/manifestation-video`);
-      if (res.ok) {
-        const text = await res.text();
-        if (text && text !== 'null') {
-          const data = JSON.parse(text);
-          setManifestationVideo(data);
-          setManifestationForm({ name: data.name, url: data.url });
-          setVideoExists(true);
-        } else {
-          setVideoExists(false);
-        }
+      const data = await contentAPI.getManifestationVideo();
+      if (data) {
+        setManifestationVideo(data);
+        setManifestationForm({ name: data.name, url: data.url });
+        setVideoExists(true);
       } else {
         setVideoExists(false);
       }
@@ -81,18 +73,18 @@ export default function AdminContentManager({ navigation, route }) {
   };
 
   const addVideo = async () => {
-    await fetch(`${API_URL}/content/admin/video`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      await contentAPI.addVideo({
         ...videoForm,
         level: parseInt(videoForm.level),
         part: videoForm.part ? parseInt(videoForm.part) : null
-      })
-    });
-    setSuccessModal('Video added successfully!');
-    setVideoForm({ title: '', url: '', level: '1', description: '', part: null });
-    loadVideos();
+      });
+      setSuccessModal('Video added successfully!');
+      setVideoForm({ title: '', url: '', level: '1', description: '', part: null });
+      loadVideos();
+    } catch (error) {
+      setErrorModal(error.message || 'Failed to add video');
+    }
   };
 
   const getVideoForLevel = (level) => {
@@ -100,46 +92,45 @@ export default function AdminContentManager({ navigation, route }) {
   };
 
   const updateVideo = async () => {
-    const existingVideo = getVideoForLevel(parseInt(videoForm.level));
-    if (existingVideo) {
-      await fetch(`${API_URL}/content/admin/video/${existingVideo.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    try {
+      const existingVideo = getVideoForLevel(parseInt(videoForm.level));
+      if (existingVideo) {
+        await contentAPI.updateVideo(existingVideo.id, {
           ...videoForm,
           level: parseInt(videoForm.level),
           part: videoForm.part ? parseInt(videoForm.part) : null
-        })
-      });
-      setSuccessModal('Video updated successfully!');
-    } else {
-      await addVideo();
+        });
+        setSuccessModal('Video updated successfully!');
+      } else {
+        await addVideo();
+        return;
+      }
+      setVideoForm({ title: '', url: '', level: '1', description: '', part: null });
+      loadVideos();
+    } catch (error) {
+      setErrorModal(error.message || 'Failed to update video');
     }
-    setVideoForm({ title: '', url: '', level: '1', description: '', part: null });
-    loadVideos();
   };
 
   const addRoutine = async () => {
-    await fetch(`${API_URL}/content/admin/routine`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      await contentAPI.addRoutine({
         ...routineForm,
         sequence: parseInt(routineForm.sequence),
         active: true
-      })
-    });
-    setSuccessModal('Routine added successfully!');
-    setRoutineForm({ name: '', description: '', sequence: '1' });
+      });
+      setSuccessModal('Routine added successfully!');
+      setRoutineForm({ name: '', description: '', sequence: '1' });
+    } catch (error) {
+      setErrorModal(error.message || 'Failed to add routine');
+    }
   };
 
   const loadHabits = async () => {
     try {
-      const res = await fetch(`${API_URL}/content/habits`);
-      const data = await res.json();
-      const habitsData = Array.isArray(data) ? data : [];
-      setHabits(habitsData);
-      setHabitForms(habitsData.map(h => ({ id: h.id, name: h.name, description: h.description })));
+      const data = await contentAPI.getHabits();
+      setHabits(data);
+      setHabitForms(data.map(h => ({ id: h.id, name: h.name, description: h.description })));
     } catch (error) {
       console.log('Error loading habits:', error);
       setHabits([]);
@@ -157,26 +148,11 @@ export default function AdminContentManager({ navigation, route }) {
 
   const addNewHabit = async () => {
     try {
-      console.log('Adding new habit...');
-      const response = await fetch(`${API_URL}/content/admin/habit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'New Task', description: 'Task description', active: true })
-      });
-      console.log('Response status:', response.status);
-      if (response.ok) {
-        const data = await response.json();
-        console.log('New habit added:', data);
-        setSuccessModal('New task added successfully!');
-        await loadHabits();
-      } else {
-        const errorText = await response.text();
-        console.error('Failed to add habit:', errorText);
-        setErrorModal(`Failed to add task: ${response.status}`);
-      }
+      await contentAPI.addHabit({ name: 'New Task', description: 'Task description', active: true });
+      setSuccessModal('New task added successfully!');
+      await loadHabits();
     } catch (error) {
-      console.error('Error adding habit:', error);
-      setErrorModal(`Failed to add task: ${error.message}`);
+      setErrorModal(error.message || 'Failed to add task');
     }
   };
 
@@ -186,31 +162,25 @@ export default function AdminContentManager({ navigation, route }) {
 
   const confirmDeleteHabit = async () => {
     try {
-      await fetch(`${API_URL}/content/admin/habit/${deleteModal}`, {
-        method: 'DELETE'
-      });
+      await contentAPI.deleteHabit(deleteModal);
       setDeleteModal(null);
       setSuccessModal('Task deleted successfully!');
       loadHabits();
     } catch (error) {
       setDeleteModal(null);
-      setErrorModal('Failed to delete task');
+      setErrorModal(error.message || 'Failed to delete task');
     }
   };
 
   const updateAllHabits = async () => {
     try {
       for (const habit of habitForms) {
-        await fetch(`${API_URL}/content/admin/habit/${habit.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: habit.name, description: habit.description, active: true })
-        });
+        await contentAPI.updateHabit(habit.id, { name: habit.name, description: habit.description, active: true });
       }
       setSuccessModal('All tasks updated successfully!');
       loadHabits();
     } catch (error) {
-      setErrorModal('Failed to update tasks');
+      setErrorModal(error.message || 'Failed to update tasks');
     }
   };
 
@@ -224,29 +194,18 @@ export default function AdminContentManager({ navigation, route }) {
       return;
     }
     
-    const payload = {
-      ...workshopForm,
-      level: parseInt(workshopForm.level),
-      active: true
-    };
-    
     try {
-      const response = await fetch(`${API_URL}/content/admin/workshop`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      await contentAPI.addWorkshop({
+        ...workshopForm,
+        level: parseInt(workshopForm.level),
+        active: true
       });
-      
-      if (response.ok) {
-        setSuccessModal('Workshop added successfully!');
-        setWorkshopForm({ title: '', description: '', level: '1', startTime: '', endTime: '', link: '', type: 'upcoming' });
-        setStartDate(new Date());
-        setEndDate(new Date());
-      } else {
-        setErrorModal('Failed to add workshop');
-      }
+      setSuccessModal('Workshop added successfully!');
+      setWorkshopForm({ title: '', description: '', level: '1', startTime: '', endTime: '', link: '', type: 'upcoming' });
+      setStartDate(new Date());
+      setEndDate(new Date());
     } catch (error) {
-      setErrorModal('Failed to add workshop: ' + error.message);
+      setErrorModal(error.message || 'Failed to add workshop');
     }
   };
 
@@ -303,14 +262,13 @@ export default function AdminContentManager({ navigation, route }) {
   };
 
   const addOrUpdateManifestationVideo = async () => {
-    const res = await fetch(`${API_URL}/content/admin/manifestation-video`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(manifestationForm)
-    });
-    const data = await res.json();
-    setSuccessModal(data.message || 'Manifestation video updated successfully!');
-    loadManifestationVideo();
+    try {
+      const data = await contentAPI.addOrUpdateManifestationVideo(manifestationForm);
+      setSuccessModal(data.message || 'Manifestation video updated successfully!');
+      loadManifestationVideo();
+    } catch (error) {
+      setErrorModal(error.message || 'Failed to update manifestation video');
+    }
   };
 
   const renderVideoTab = () => {
@@ -455,15 +413,11 @@ export default function AdminContentManager({ navigation, route }) {
 
   const createDefaultTasks = async () => {
     try {
-      const response = await fetch(`${API_URL}/content/admin/fix-habits`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const data = await response.json();
+      const data = await contentAPI.fixHabits();
       setSuccessModal(data.message || 'Default tasks created successfully!');
       loadHabits();
     } catch (error) {
-      setErrorModal('Failed to create default tasks');
+      setErrorModal(error.message || 'Failed to create default tasks');
     }
   };
 
@@ -713,7 +667,7 @@ export default function AdminContentManager({ navigation, route }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('AdminDashboard')}>
           <MaterialIcons name="arrow-back" size={20} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Content Manager</Text>
@@ -801,12 +755,12 @@ export default function AdminContentManager({ navigation, route }) {
               <MaterialIcons name="warning" size={56} color="#F59E0B" style={{marginBottom: 16}} />
               <Text style={styles.successTitle}>Delete Task?</Text>
               <Text style={styles.successDesc}>Are you sure you want to delete this task? This action cannot be undone.</Text>
-              <View style={{flexDirection: 'row', gap: 10, width: '100%'}}>
-                <TouchableOpacity style={[styles.successBtn, {flex: 1, backgroundColor: '#6B7280'}]} onPress={() => setDeleteModal(null)}>
-                  <Text style={styles.successBtnText}>Cancel</Text>
+              <View style={{flexDirection: 'row', gap: 8, width: '100%'}}>
+                <TouchableOpacity style={[styles.successBtn, {flex: 1, backgroundColor: '#6B7280', paddingVertical: 10, paddingHorizontal: 8}]} onPress={() => setDeleteModal(null)}>
+                  <Text style={[styles.successBtnText, {fontSize: 13}]}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.successBtn, {flex: 1, backgroundColor: '#EF4444'}]} onPress={confirmDeleteHabit}>
-                  <Text style={styles.successBtnText}>Delete</Text>
+                <TouchableOpacity style={[styles.successBtn, {flex: 1, backgroundColor: '#EF4444', paddingVertical: 10, paddingHorizontal: 8}]} onPress={confirmDeleteHabit}>
+                  <Text style={[styles.successBtnText, {fontSize: 13}]}>Delete</Text>
                 </TouchableOpacity>
               </View>
             </View>

@@ -4,11 +4,9 @@ import { authAPI } from '../../services/api';
 
 export default function ForgotPasswordScreen({ navigation }) {
   const [email, setEmail] = useState('');
-  const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showTokenInput, setShowTokenInput] = useState(false);
 
-  const handleSendToken = async () => {
+  const handleSendOTP = async () => {
     if (!email) {
       alert('Please enter your email');
       return;
@@ -17,21 +15,13 @@ export default function ForgotPasswordScreen({ navigation }) {
     setLoading(true);
     try {
       await authAPI.forgotPassword(email);
-      alert('Reset token sent to your email! Copy and paste it below.');
-      setShowTokenInput(true);
+      alert('OTP sent to your email!');
+      navigation.navigate('ResetPassword', { email });
     } catch (error) {
       alert(error.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleContinue = () => {
-    if (!token) {
-      alert('Please enter the token from your email');
-      return;
-    }
-    navigation.navigate('ResetPassword', { token });
   };
 
   return (
@@ -43,7 +33,7 @@ export default function ForgotPasswordScreen({ navigation }) {
               <Text style={styles.logo}>🔐</Text>
             </View>
             <Text style={styles.title}>Reset Password</Text>
-            <Text style={styles.subtitle}>We'll send you a reset link</Text>
+            <Text style={styles.subtitle}>We'll send you an OTP</Text>
           </View>
 
           <View style={styles.formContainer}>
@@ -57,29 +47,13 @@ export default function ForgotPasswordScreen({ navigation }) {
               keyboardType="email-address"
             />
 
-            {!showTokenInput ? (
-              <TouchableOpacity style={styles.button} onPress={handleSendToken} disabled={loading}>
-                {loading ? (
-                  <ActivityIndicator color="#000000" />
-                ) : (
-                  <Text style={styles.buttonText}>Send Reset Token</Text>
-                )}
-              </TouchableOpacity>
-            ) : (
-              <>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Paste Token from Email"
-                  placeholderTextColor="#8E8E93"
-                  value={token}
-                  onChangeText={setToken}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity style={styles.button} onPress={handleContinue}>
-                  <Text style={styles.buttonText}>Continue</Text>
-                </TouchableOpacity>
-              </>
-            )}
+            <TouchableOpacity style={styles.button} onPress={handleSendOTP} disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color="#000000" />
+              ) : (
+                <Text style={styles.buttonText}>Send OTP</Text>
+              )}
+            </TouchableOpacity>
 
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Login')}>
               <Text style={styles.backText}>← Back to Login</Text>

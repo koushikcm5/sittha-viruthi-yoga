@@ -1,17 +1,17 @@
-// Create admin user - username MUST start with "admin"
+// Create a real admin user you can actually use
 const API_URL = 'https://feisty-tenderness-production.up.railway.app/api';
 
-async function createAdminUser() {
+async function createRealAdmin() {
   const admin = {
-    name: 'Main Admin',
-    username: 'adminmain',  // Starts with "admin" - will be ADMIN role
-    email: 'adminmain@example.com',
+    name: 'Super Admin',
+    username: 'superadmin',
+    email: 'superadmin@example.com',
     phone: '9876543210',
     password: 'Admin123'
   };
   
-  console.log('Creating admin user...');
-  console.log('Username:', admin.username, '(starts with "admin")');
+  console.log('Creating superadmin user...');
+  console.log('Username:', admin.username);
   console.log('Password:', admin.password);
   
   try {
@@ -24,7 +24,7 @@ async function createAdminUser() {
     const data = await response.json();
     
     if (response.ok) {
-      console.log('\n✅ User created!');
+      console.log('\n✅ User created successfully!');
       
       // Wait and test login
       await new Promise(r => setTimeout(r, 2000));
@@ -43,13 +43,8 @@ async function createAdminUser() {
       if (loginResponse.ok) {
         console.log('\n✅ LOGIN SUCCESSFUL!');
         console.log('Role:', loginData.role);
-        
-        if (loginData.role === 'ADMIN') {
-          console.log('\n🎉 SUCCESS! User has ADMIN role!');
-        }
-        
-        console.log('\n=== LOGIN CREDENTIALS ===');
-        console.log('Username: adminmain');
+        console.log('\n=== USE THESE CREDENTIALS ===');
+        console.log('Username: superadmin');
         console.log('Password: Admin123');
         console.log('Role:', loginData.role);
       } else {
@@ -58,6 +53,12 @@ async function createAdminUser() {
       
     } else {
       console.log('\n❌ Registration failed:', data);
+      
+      if (data.error && data.error.includes('already exists')) {
+        console.log('\n✅ User already exists! Use these credentials:');
+        console.log('Username: superadmin');
+        console.log('Password: Admin123');
+      }
     }
     
   } catch (error) {
@@ -65,4 +66,4 @@ async function createAdminUser() {
   }
 }
 
-createAdminUser();
+createRealAdmin();

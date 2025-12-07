@@ -3,7 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingVi
 import { authAPI } from '../../services/api';
 
 export default function ResetPasswordScreen({ route, navigation }) {
-  const { token } = route.params;
+  const { email } = route.params;
+  const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,8 +25,13 @@ export default function ResetPasswordScreen({ route, navigation }) {
   };
 
   const handleResetPassword = async () => {
-    if (!newPassword || !confirmPassword) {
+    if (!otp || !newPassword || !confirmPassword) {
       alert('Please fill all fields');
+      return;
+    }
+
+    if (otp.length !== 6) {
+      alert('OTP must be 6 digits');
       return;
     }
 
@@ -42,7 +48,7 @@ export default function ResetPasswordScreen({ route, navigation }) {
 
     setLoading(true);
     try {
-      await authAPI.resetPassword(token, newPassword);
+      await authAPI.resetPassword(email, otp, newPassword);
       alert('Password reset successful!');
       navigation.navigate('Login');
     } catch (error) {
@@ -65,6 +71,16 @@ export default function ResetPasswordScreen({ route, navigation }) {
           </View>
 
           <View style={styles.formContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter 6-digit OTP"
+              placeholderTextColor="#8E8E93"
+              value={otp}
+              onChangeText={setOtp}
+              keyboardType="number-pad"
+              maxLength={6}
+            />
+
             <TextInput
               style={styles.input}
               placeholder="New Password (min 8 chars)"

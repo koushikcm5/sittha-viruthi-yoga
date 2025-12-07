@@ -8,18 +8,15 @@ import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 import ResetPasswordScreen from './src/screens/auth/ResetPasswordScreen';
-import VerifyEmailScreen from './src/screens/auth/VerifyEmailScreen';
 import SplashScreen from './src/screens/auth/SplashScreen';
 
 // User Screens
 import ChemsingDashboard from './src/screens/user/ChemsingDashboard';
-import UserDashboardScreen from './src/screens/user/UserDashboardScreen';
-import EnhancedUserDashboard from './src/screens/user/EnhancedUserDashboard';
+// Removed unused dashboard imports
 import RoutineDetailScreen from './src/screens/user/RoutineDetailScreen';
 import NotificationsScreen from './src/screens/user/NotificationsScreen';
 
 // Admin Screens
-import AdminScreen from './src/screens/admin/AdminScreen';
 import AdminDashboard from './src/screens/admin/AdminDashboard';
 import AdminContentManager from './src/screens/admin/AdminContentManager';
 import AdminNotificationsScreen from './src/screens/admin/AdminNotificationsScreen';
@@ -76,11 +73,8 @@ export default function App() {
       <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
-        <Stack.Screen name="Admin" component={AdminScreen} />
         <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
-        <Stack.Screen name="UserDashboard" component={UserDashboardScreen} />
-        <Stack.Screen name="EnhancedUserDashboard" component={EnhancedUserDashboard} />
+        {/* Removed unused dashboard screens */}
         <Stack.Screen name="ChemsingDashboard" component={ChemsingDashboard} />
         <Stack.Screen name="AdminContentManager" component={AdminContentManager} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />

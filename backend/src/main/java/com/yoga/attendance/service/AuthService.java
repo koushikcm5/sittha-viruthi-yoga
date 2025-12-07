@@ -4,7 +4,6 @@ import com.yoga.attendance.dto.*;
 import com.yoga.attendance.entity.User;
 import com.yoga.attendance.repository.UserRepository;
 import com.yoga.attendance.repository.AttendanceRepository;
-import com.yoga.attendance.repository.PasswordResetTokenRepository;
 import com.yoga.attendance.repository.UserLevelRepository;
 import com.yoga.attendance.security.JwtUtil;
 import com.yoga.attendance.util.InputSanitizer;
@@ -20,7 +19,6 @@ public class AuthService {
     
     private final UserRepository userRepository;
     private final AttendanceRepository attendanceRepository;
-    private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final UserLevelRepository userLevelRepository;
     private final com.yoga.attendance.repository.UserProgressRepository userProgressRepository;
     private final PasswordEncoder passwordEncoder;
@@ -34,10 +32,6 @@ public class AuthService {
         
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Invalid credentials");
-        }
-        
-        if (!user.getEmailVerified()) {
-            throw new RuntimeException("EMAIL_NOT_VERIFIED");
         }
         
         if (!user.getApproved()) {
@@ -76,54 +70,53 @@ public class AuthService {
         user.setEmail(email);
         user.setPhone(phone);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        // Create as ADMIN if username starts with 'admin', otherwise USER
         if (username.toLowerCase().startsWith("admin")) {
             user.setRole(User.Role.ADMIN);
+            user.setApproved(true);
         } else {
             user.setRole(User.Role.USER);
+            user.setApproved(false);
         }
-        user.setApproved(true);  // Auto-approve for easier testing
-        user.setEmailVerified(true);  // Auto-verify for easier testing
-        user.setVerificationToken(UUID.randomUUID().toString());
+        user.setEmailVerified(true);
         
         userRepository.save(user);
         
-        // Send email asynchronously to avoid blocking registration
-        try {
-            emailService.sendVerificationEmail(user.getEmail(), user.getVerificationToken());
-        } catch (Exception e) {
-            // Log error but don't fail registration
-            System.err.println("Failed to send verification email: " + e.getMessage());
-        }
-        
-        return Map.of("message", "Registration successful. Please check your email to verify your account.");
+        return Map.of("message", "Registration successful. Please wait for admin approval.");
     }
     
     public Map<String, String> forgotPassword(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Email not found"));
         
-        String resetToken = UUID.randomUUID().toString();
-        user.setResetToken(resetToken);
-        user.setResetTokenExpiry(java.time.LocalDateTime.now().plusHours(1));
+        String otp = String.format("%06d", new Random().nextInt(1000000));
+        user.setResetOtp(otp);
+        user.setResetOtpExpiry(java.time.LocalDateTime.now().plusMinutes(10));
         userRepository.save(user);
         
-        emailService.sendPasswordResetEmail(user.getEmail(), resetToken);
+        try {
+            emailService.sendPasswordResetOtp(user.getEmail(), otp);
+        } catch (Exception e) {
+            System.err.println("Failed to send reset OTP: " + e.getMessage());
+        }
         
-        return Map.of("message", "Password reset link sent to email");
+        return Map.of("message", "Password reset OTP sent to email");
     }
     
-    public Map<String, String> resetPassword(String token, String newPassword) {
-        User user = userRepository.findByResetToken(token)
-                .orElseThrow(() -> new RuntimeException("Invalid or expired token"));
+    public Map<String, String> resetPassword(String email, String otp, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Email not found"));
         
-        if (user.getResetTokenExpiry().isBefore(java.time.LocalDateTime.now())) {
-            throw new RuntimeException("Token expired");
+        if (user.getResetOtp() == null || !user.getResetOtp().equals(otp)) {
+            throw new RuntimeException("Invalid OTP");
+        }
+        
+        if (user.getResetOtpExpiry().isBefore(java.time.LocalDateTime.now())) {
+            throw new RuntimeException("OTP expired");
         }
         
         user.setPassword(passwordEncoder.encode(newPassword));
-        user.setResetToken(null);
-        user.setResetTokenExpiry(null);
+        user.setResetOtp(null);
+        user.setResetOtpExpiry(null);
         userRepository.save(user);
         
         return Map.of("message", "Password reset successful");
@@ -139,9 +132,6 @@ public class AuthService {
         }
         
         try {
-            passwordResetTokenRepository.deleteByUser(user);
-            passwordResetTokenRepository.flush();
-            
             userProgressRepository.deleteByUsername(username);
             userProgressRepository.flush();
             
@@ -186,12 +176,21 @@ public class AuthService {
         return Map.of("message", "User approved successfully");
     }
     
-    public Map<String, String> verifyEmail(String token) {
-        User user = userRepository.findByVerificationToken(token)
-                .orElseThrow(() -> new RuntimeException("Invalid verification token"));
+    public Map<String, String> verifyEmail(String email, String otp) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Email not found"));
+        
+        if (user.getVerificationOtp() == null || !user.getVerificationOtp().equals(otp)) {
+            throw new RuntimeException("Invalid OTP");
+        }
+        
+        if (user.getVerificationOtpExpiry().isBefore(java.time.LocalDateTime.now())) {
+            throw new RuntimeException("OTP expired");
+        }
         
         user.setEmailVerified(true);
-        user.setVerificationToken(null);
+        user.setVerificationOtp(null);
+        user.setVerificationOtpExpiry(null);
         userRepository.save(user);
         
         return Map.of("message", "Email verified successfully");
@@ -205,10 +204,12 @@ public class AuthService {
             throw new RuntimeException("Email already verified");
         }
         
-        user.setVerificationToken(UUID.randomUUID().toString());
+        String otp = String.format("%06d", new Random().nextInt(999999));
+        user.setVerificationOtp(otp);
+        user.setVerificationOtpExpiry(java.time.LocalDateTime.now().plusMinutes(10));
         userRepository.save(user);
-        emailService.sendVerificationEmail(user.getEmail(), user.getVerificationToken());
+        emailService.sendVerificationOtp(user.getEmail(), otp);
         
-        return Map.of("message", "Verification email sent");
+        return Map.of("message", "Verification OTP sent");
     }
 }

@@ -7,6 +7,21 @@ import { notificationService } from '../../services/notificationService';
 export default function NotificationsScreen({ navigation }) {
   const [notifications, setNotifications] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState('ALL');
+
+  const getFilteredNotifications = () => {
+    if (filter === 'ALL') return notifications;
+    if (filter === 'UNREAD') return notifications.filter(n => !n.read);
+    return notifications.filter(n => n.type === filter);
+  };
+
+  const getNotificationCounts = () => {
+    const total = notifications.length;
+    const unread = notifications.filter(n => !n.read).length;
+    const success = notifications.filter(n => n.type === 'SUCCESS').length;
+    const reminders = notifications.filter(n => n.type === 'REMINDER').length;
+    return { total, unread, success, reminders };
+  };
 
   useEffect(() => {
     loadNotifications();
@@ -37,12 +52,29 @@ export default function NotificationsScreen({ navigation }) {
 
   const getIcon = (type) => {
     switch (type) {
+      case 'SUCCESS': return 'check-circle';
+      case 'WARNING': return 'warning';
+      case 'INFO': return 'info';
+      case 'REMINDER': return 'alarm';
       case 'WORKSHOP': return 'event';
       case 'SESSION': return 'video-library';
-      case 'TASK_REMINDER': return 'alarm';
       case 'APPOINTMENT': return 'calendar-today';
       case 'QA': return 'question-answer';
+      case 'ATTENDANCE': return 'how-to-reg';
+      case 'LEVEL_UP': return 'trending-up';
+      case 'VIDEO': return 'play-circle-filled';
       default: return 'notifications';
+    }
+  };
+
+  const getIconColor = (type) => {
+    switch (type) {
+      case 'SUCCESS': return '#10B981';
+      case 'WARNING': return '#F59E0B';
+      case 'INFO': return '#3B82F6';
+      case 'REMINDER': return '#8B5CF6';
+      case 'LEVEL_UP': return '#F59E0B';
+      default: return '#00A8A8';
     }
   };
 
@@ -50,8 +82,8 @@ export default function NotificationsScreen({ navigation }) {
     <TouchableOpacity
       style={[styles.notificationCard, !item.read && styles.unreadCard]}
       onPress={() => handleNotificationPress(item)}>
-      <View style={styles.iconCircle}>
-        <MaterialIcons name={getIcon(item.type)} size={24} color="#00A8A8" />
+      <View style={[styles.iconCircle, { backgroundColor: `${getIconColor(item.type)}20` }]}>
+        <MaterialIcons name={getIcon(item.type)} size={24} color={getIconColor(item.type)} />
       </View>
       <View style={styles.notificationContent}>
         <Text style={styles.notificationTitle}>{item.title}</Text>
@@ -67,7 +99,7 @@ export default function NotificationsScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('ChemsingDashboard')} style={styles.backBtn}>
           <MaterialIcons name="arrow-back" size={24} color="#1B3B6F" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
@@ -76,8 +108,27 @@ export default function NotificationsScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.filterTabs}>
+        {['ALL', 'UNREAD', 'SUCCESS', 'REMINDER'].map(tab => {
+          const counts = getNotificationCounts();
+          const count = tab === 'ALL' ? counts.total : 
+                      tab === 'UNREAD' ? counts.unread :
+                      tab === 'SUCCESS' ? counts.success : counts.reminders;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.filterTab, filter === tab && styles.activeFilterTab]}
+              onPress={() => setFilter(tab)}>
+              <Text style={[styles.filterTabText, filter === tab && styles.activeFilterTabText]}>
+                {tab} {count > 0 && `(${count})`}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <FlatList
-        data={notifications}
+        data={getFilteredNotifications()}
         renderItem={renderNotification}
         keyExtractor={(item) => item.id.toString()}
         refreshControl={
@@ -166,5 +217,31 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     color: '#9CA3AF', 
     marginTop: 16 
+  },
+  filterTabs: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB'
+  },
+  filterTab: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6'
+  },
+  activeFilterTab: {
+    backgroundColor: '#00A8A8'
+  },
+  filterTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280'
+  },
+  activeFilterTabText: {
+    color: '#FFFFFF'
   }
 });
