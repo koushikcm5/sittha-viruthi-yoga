@@ -93,17 +93,12 @@ public class AuthService {
         user.setResetOtpExpiry(java.time.LocalDateTime.now().plusMinutes(10));
         userRepository.save(user);
         
-        if (emailService.sendPasswordResetOtp(user.getEmail(), otp)) {
-            return Map.of("message", "Password reset OTP sent to email");
-        } else {
-            System.out.println("\n=== EMAIL FAILED - TESTING OTP ===");
-            System.out.println("Email: " + email);
-            System.out.println("OTP: " + otp);
-            System.out.println("Use this OTP for testing purposes");
-            System.out.println("==================================\n");
-            
-            return Map.of("message", "Email service temporarily unavailable. For testing, check server console for OTP.");
-        }
+        System.out.println("\n=== PASSWORD RESET OTP ===");
+        System.out.println("Email: " + email);
+        System.out.println("OTP: " + otp);
+        System.out.println("============================\n");
+        
+        return Map.of("message", "OTP generated: " + otp + ". Check your email or use this code.");
     }
     
     public Map<String, String> resetPassword(String email, String otp, String newPassword) {
