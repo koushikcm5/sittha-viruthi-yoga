@@ -25,12 +25,7 @@ export default function ForgotPasswordScreen({ navigation }) {
       await authAPI.forgotPassword(email);
       setSuccessModal(true);
     } catch (error) {
-      const message = error.message || 'Failed to send OTP. Please try again.';
-      if (message.includes('temporarily unavailable')) {
-        setSuccessModal(true); // Show success since OTP is available in console
-      } else {
-        setErrorModal(message);
-      }
+      setErrorModal(error.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -89,7 +84,7 @@ export default function ForgotPasswordScreen({ navigation }) {
               </View>
               <Text style={styles.modalTitle}>OTP Sent Successfully!</Text>
               <Text style={styles.modalDesc}>
-                OTP has been generated. Check your email or server console for the 6-digit code.
+                We've sent a 6-digit OTP to your email address. Please check your inbox (and spam folder).
               </Text>
               <TouchableOpacity style={styles.modalBtn} onPress={handleSuccessClose}>
                 <Text style={styles.modalBtnText}>Continue</Text>
